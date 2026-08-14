@@ -1,0 +1,276 @@
+import {
+  CHECK_STATUS,
+  COSTON2_CHAIN_ID,
+  DEMO_QUOTED_OUTPUT,
+  INPUT_DECIMALS,
+  INPUT_SYMBOL,
+  OUTPUT_DECIMALS,
+  OUTPUT_SYMBOL,
+  PRESETS,
+  STATUS,
+  canonicalize,
+  createDraft,
+  createEvidence,
+  createLiveEvidencePlaceholder,
+  createRiskCapsule,
+  evaluateVerdict,
+  runDeterministicChecks,
+  shortAddress,
+} from "./core.js";
+import { FixtureAdapter, LiveFdcAdapter } from "./evidence.js";
+import "./styles.css";
+
+const app = document.querySelector("#app");
+const state = {
+  preset: PRESETS[0],
+  draft: createDraft(PRESETS[0]),
+  checks: [],
+  capsule: null,
+  status: STATUS.DRAFT,
+  evidence: null,
+  verdict: null,
+  wallet: { address: null, chainId: null, mode: "DEMO" },
+  activeTab: "held",
+  toast: null,
+};
+const publicReceiptId = location.pathname.startsWith("/receipt/") ? decodeURIComponent(location.pathname.slice("/receipt/".length)) : null;
+
+const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+const utf8Hex = (value) => `0x${Array.from(new TextEncoder().encode(value), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+const formatBps = (bps) => `${(Number(bps) / 100).toFixed(2)}%`;
+const formatTime = (seconds) => `${Math.max(0, Math.round((Number(seconds) - Date.now() / 1000) / 60))} min`;
+const formatUnits = (value, decimals, symbol, precision = 6) => {
+  const amount = Number(value || 0) / 10 ** decimals;
+  return `${amount.toFixed(precision).replace(/\.?(0+)$/, "")} ${symbol}`;
+};
+const formatInput = (value) => formatUnits(value, INPUT_DECIMALS, INPUT_SYMBOL);
+const formatOutput = (value) => formatUnits(value, OUTPUT_DECIMALS, OUTPUT_SYMBOL);
+
+function showToast(message, tone = "neutral") {
+  state.toast = { message, tone };
+  render();
+  window.setTimeout(() => {
+    state.toast = null;
+    render();
+  }, 3200);
+}
+
+function syncRisk() {
+  state.checks = runDeterministicChecks(state.draft);
+  state.capsule = createRiskCapsule(state.draft, state.checks, "FIXTURE");
+}
+
+function selectPreset(id) {
+  state.preset = PRESETS.find((preset) => preset.id === id) || PRESETS[0];
+  state.draft = createDraft(state.preset);
+  state.status = STATUS.DRAFT;
+  state.evidence = null;
+  state.verdict = null;
+  syncRisk();
+  render();
+}
+
+async function connectWallet() {
+  if (!window.ethereum?.request) {
+    state.wallet = { address: "0xDEMO…C0DE", chainId: COSTON2_CHAIN_ID, mode: "DEMO" };
+    showToast("Demo wallet active · no transaction will be broadcast", "info");
+    return;
+  }
+  try {
+    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+    const chainHex = await window.ethereum.request({ method: "eth_chainId" });
+    const chainId = Number.parseInt(chainHex, 16);
+    state.wallet = { address: accounts[0], chainId, mode: "WALLET" };
+    state.draft.trader = accounts[0];
+    if (chainId !== COSTON2_CHAIN_ID) showToast("Connected, but switch to Coston2 before signing", "warning");
+    else showToast(`Wallet connected · ${shortAddress(accounts[0])}`, "success");
+    syncRisk();
+    render();
+  } catch (error) {
+    showToast(`Wallet connection failed · ${error?.message || "user rejected"}`, "danger");
+  }
+}
+
+async function signReceipt() {
+  if (state.checks.some((check) => check.status === CHECK_STATUS.BLOCKED)) {
+    showToast("A deterministic check is blocked. Fix the line before signing.", "danger");
+    return;
+  }
+  if (state.wallet.mode === "WALLET" && state.wallet.address && window.ethereum?.request) {
+    try {
+      await window.ethereum.request({
+        method: "personal_sign",
+        params: [utf8Hex(canonicalize(state.draft)), state.wallet.address],
+      });
+    } catch (error) {
+      showToast(`Signature rejected · ${error?.message || "wallet cancelled"}`, "danger");
+      return;
+    }
+  }
+  state.status = STATUS.SIGNED;
+  showToast("Decision Receipt signed · wallet remains in control", "success");
+  render();
+}
+
+function replay(kind) {
+  state.activeTab = kind;
+  state.status = STATUS.TRADE_SUBMITTED;
+  state.evidence = null;
+  state.verdict = null;
+  render();
+  window.setTimeout(() => {
+    state.status = STATUS.PROOF_REQUESTED;
+    render();
+  }, 360);
+  window.setTimeout(() => {
+    state.status = STATUS.PROOF_FINALIZED;
+    render();
+  }, 760);
+  window.setTimeout(async () => {
+    state.status = STATUS.VERIFIED;
+    state.evidence = await new FixtureAdapter(kind).getEvidence(state.draft);
+    state.verdict = evaluateVerdict(state.draft, state.evidence);
+    state.status = state.verdict.status;
+    render();
+  }, 1160);
+}
+
+function showLiveReceipt() {
+  state.activeTab = "live";
+  state.status = STATUS.PROOF_FINALIZED;
+  new LiveFdcAdapter().getEvidence(state.draft).then((evidence) => {
+    state.evidence = evidence;
+    state.verdict = evaluateVerdict(state.draft, evidence);
+    state.status = state.verdict.status;
+    render();
+  });
+  render();
+}
+
+function updateField(field, value) {
+  if (field === "maxPositionBps") state.draft[field] = Number(value);
+  else state.draft[field] = value;
+  syncRisk();
+  state.status = STATUS.DRAFT;
+  state.verdict = null;
+  render();
+}
+
+function checkRow(check) {
+  const tone = check.status.toLowerCase();
+  return `<div class="check-row"><span class="check-dot ${tone}"></span><span class="check-name">${escapeHtml(check.label)}</span><span class="check-detail">${escapeHtml(check.detail)}</span><span class="check-status ${tone}">${escapeHtml(check.status)}</span></div>`;
+}
+
+function renderPresets() {
+  return PRESETS.map((preset) => `<button class="preset ${state.preset.id === preset.id ? "selected" : ""}" data-preset="${preset.id}">
+    <span class="preset-top"><span class="preset-eyebrow">${preset.eyebrow}</span><span class="preset-badge">${preset.badge}</span></span>
+    <strong>${preset.label}</strong><span>${preset.description}</span>
+  </button>`).join("");
+}
+
+function renderStatusLine() {
+  const stages = ["DRAFT", "SIGNED", "TRADE_SUBMITTED", "PROOF_REQUESTED", "VERIFIED"];
+  const currentIndex = state.status === STATUS.LINE_HELD || state.status === STATUS.LINE_CROSSED ? 4 : Math.max(0, stages.indexOf(state.status));
+  return stages.map((stage, index) => `<div class="status-stage ${index <= currentIndex ? "done" : ""} ${stage === state.status ? "current" : ""}"><span>${index + 1}</span><small>${stage.replaceAll("_", " ")}</small></div>`).join("<i></i>");
+}
+
+function renderRiskBrief() {
+  if (!state.capsule) return "";
+  const capsule = state.capsule;
+  return `<section class="panel risk-panel" id="risk-panel">
+    <div class="panel-heading"><div><span class="section-kicker">02 · SEE THE RISK</span><h2>Risk Capsule</h2></div><div class="risk-score"><span>${capsule.score}</span><small>/ 100</small><b>${capsule.riskLevel}</b></div></div>
+    <div class="risk-summary"><div class="signal-ring"><span>${capsule.score}</span></div><div><strong>${escapeHtml(capsule.ai.summary)}</strong><p>${capsule.ai.reasons.map(escapeHtml).join(" · ")}</p></div><span class="source-pill fixture">AI BRIEF · ${capsule.ai.status}</span></div>
+    <div class="checks">${capsule.deterministicChecks.map(checkRow).join("")}</div>
+    <div class="intel-strip"><span class="source-pill fixture">THREAT SNAPSHOT · ${capsule.threatIntel.status}</span><span>${escapeHtml(capsule.threatIntel.source)}</span><span>fresh for 5 min</span><span>confidence ${Math.round(capsule.threatIntel.confidence * 100)}%</span></div>
+    <div class="security-note"><span>◈</span><p><strong>Safety boundary</strong> AI explains the risk. Deterministic checks can block. Only verified Flare facts can create <code>LINE HELD</code>.</p></div>
+  </section>`;
+}
+
+function renderEvidence() {
+  if (!state.evidence) return `<div class="empty-proof"><span class="empty-icon">↗</span><div><strong>Flare is waiting for a transaction</strong><p>Run a replay, or open LIVE FDC to inspect the deployed Coston2 Receipt.</p></div></div>`;
+  const evidence = state.evidence;
+  const verdict = state.verdict;
+  const isHeld = verdict?.status === STATUS.LINE_HELD;
+  const isCrossed = verdict?.status === STATUS.LINE_CROSSED;
+  return `<div class="proof-result ${isHeld ? "held" : isCrossed ? "crossed" : "unknown"}">
+    <div class="proof-verdict"><span class="verdict-mark">${isHeld ? "✓" : isCrossed ? "×" : "?"}</span><div><span class="section-kicker">FINAL FACT JUDGE · ${escapeHtml(evidence.provenance)}</span><h3>${escapeHtml(verdict?.status || STATUS.UNVERIFIED).replaceAll("_", " ")}</h3><p>${escapeHtml(verdict?.reasons?.[0] || evidence.reason || "Awaiting verification")}</p></div></div>
+    <div class="proof-grid"><div><small>PROOF SOURCE</small><strong>${escapeHtml(evidence.source)}</strong></div><div><small>EXTERNAL TX</small><strong class="mono">${evidence.externalTxUrl ? `<a href="${evidence.externalTxUrl}" target="_blank" rel="noreferrer">${escapeHtml(evidence.transactionHash).slice(0, 18)}…</a>` : `${escapeHtml(evidence.transactionHash || "—").slice(0, 18)}…`}</strong></div><div><small>AMOUNT IN</small><strong>${formatInput(evidence.amountIn)}</strong></div><div><small>AMOUNT OUT</small><strong>${formatOutput(evidence.amountOut)}</strong></div></div>
+    <div class="provenance-line"><span class="source-pill ${evidence.provenance.toLowerCase()}">${escapeHtml(evidence.provenance)}</span><span>${escapeHtml(evidence.verificationStatus)}</span><span class="mono">proof: ${escapeHtml(evidence.proofReference || "pending")}</span>${evidence.verdictUrl ? `<a href="${evidence.verdictUrl}" target="_blank" rel="noreferrer">View Coston2 verdict ↗</a>` : ""}</div>
+  </div>`;
+}
+
+function renderAccountability() {
+  if (!state.verdict || !state.evidence) return "";
+  const evidence = state.evidence;
+  return `<section class="panel accountability"><div class="panel-heading"><div><span class="section-kicker">06 · KEEP THE RECORD</span><h2>Accountability Card</h2></div><button class="text-button" data-action="copy">Copy receipt ↗</button></div>
+    <div class="comparison"><div><small>YOUR LINE</small><strong>Max input</strong><span>${formatInput(state.draft.maxInput)}</span></div><div class="comparison-arrow">→</div><div><small>VERIFIED FACT</small><strong>Actual input</strong><span>${formatInput(evidence.amountIn)}</span></div><div class="comparison-result ${state.verdict.status === STATUS.LINE_HELD ? "good" : "bad"}">${state.verdict.status === STATUS.LINE_HELD ? "MATCH" : "CROSSED"}</div></div>
+    <div class="receipt-meta"><span><b>Receipt</b> ${escapeHtml((evidence.receiptId || state.draft.nonce).slice(0, 18))}…</span><span><b>Network</b> Coston2 · 114</span><span><b>Source</b> ${escapeHtml(evidence.provenance)}</span></div>
+  </section>`;
+}
+
+function renderPublicReceipt() {
+  const evidence = createEvidence(state.draft, "held");
+  return `<div class="public-shell"><header class="topbar"><a class="brand" href="/"><span class="brand-mark">/</span><span>REDLINE<em>RECEIPT</em></span></a><span class="source-pill fixture">PUBLIC RECEIPT · FIXTURE</span></header><main class="public-main"><div class="public-kicker">READ-ONLY VERIFICATION</div><h1>Receipt <i>held.</i></h1><p class="public-intro">A public, wallet-free view of what was promised, what was verified, and where the evidence came from.</p><section class="public-verdict"><div class="verdict-mark">✓</div><div><span class="section-kicker">FINAL VERDICT · FIXTURE</span><h2>LINE HELD</h2><p>All committed limits matched in this controlled replay.</p></div></section><section class="public-grid"><div class="public-card"><small>RECEIPT ID</small><strong class="mono">${escapeHtml(publicReceiptId || state.draft.nonce)}</strong><span>Non-enumerable demo identifier</span></div><div class="public-card"><small>NETWORK</small><strong>Coston2 · 114</strong><span>Flare testnet</span></div><div class="public-card"><small>PROOF SOURCE</small><strong>Redline Demo Replay</strong><span>Explicitly labeled FIXTURE</span></div><div class="public-card"><small>FRESHNESS</small><strong>5 min window</strong><span>Snapshot is time-bound</span></div></section><section class="public-card commitments"><div class="section-kicker">COMMITMENTS VS FACTS</div><div class="public-row"><span>Max input</span><b>${formatInput(state.draft.maxInput)}</b><i>Actual ${formatInput(evidence.amountIn)} · MATCH</i></div><div class="public-row"><span>Minimum output</span><b>${formatOutput(state.draft.minOutput)}</b><i>Actual ${formatOutput(evidence.amountOut)} · MATCH</i></div><div class="public-row"><span>Router</span><b class="mono">${state.draft.router.slice(0, 12)}…</b><i>MATCH</i></div></section><section class="public-warning"><strong>What this page proves</strong><p>This page demonstrates the Receipt and evidence shape. It is not a live FDC proof. The live adapter remains visibly <code>UNVERIFIED</code> until its Coston2 request and proof fields are configured.</p></section><a class="primary-button" href="/">Create your own Receipt <span>↗</span></a></main><footer class="footer"><span>REDLINE RECEIPT · Public Receipt</span><a href="https://dev.flare.network/fdc/overview" target="_blank" rel="noreferrer">Verify FDC integration ↗</a></footer></div>`;
+}
+
+function render() {
+  if (publicReceiptId) {
+    app.innerHTML = renderPublicReceipt();
+    return;
+  }
+  const walletLabel = state.wallet.address ? shortAddress(state.wallet.address) : "Connect wallet";
+  const verdictClass = state.verdict?.status === STATUS.LINE_HELD ? "held" : state.verdict?.status === STATUS.LINE_CROSSED ? "crossed" : "";
+  app.innerHTML = `<div class="shell">
+    <header class="topbar"><a class="brand" href="/"><span class="brand-mark">/</span><span>REDLINE<em>RECEIPT</em></span></a><div class="top-actions"><span class="network"><i></i> COSTON2 · 114</span><button class="wallet-button" data-action="connect">${walletLabel}<span>↗</span></button></div></header>
+    <main>
+      <section class="hero"><div class="hero-copy"><span class="hero-kicker">FLARE SUMMER SIGNAL · BOUNTY 1</span><h1>Don’t trade<br /><i>past your line.</i></h1><p>Redline makes your own trading limits explicit before you sign — then lets Flare verify whether you kept them.</p><div class="hero-actions"><a class="primary-button" href="#flow">Draw your line <span>↓</span></a><span class="hero-caption"><span class="pulse"></span> AI explains · Flare verifies</span></div></div><div class="hero-art"><div class="crosshair"><span></span><b>REDLINE</b></div><div class="floating-note note-one"><span>01</span> set your limit</div><div class="floating-note note-two"><span>02</span> let the chain judge</div></div></section>
+      <section class="principles"><div><span>01</span><strong>SELF-AUTHORED</strong><p>Your rule, not a bot’s.</p></div><div><span>02</span><strong>EXPLAINABLE</strong><p>Every warning has a reason.</p></div><div><span>03</span><strong>VERIFIABLE</strong><p>Facts land on Flare.</p></div></section>
+      <section id="flow" class="flow-wrap"><div class="flow-header"><div><span class="section-kicker">THE DECISION LOOP</span><h2>Draw the line.<br /><span>Make the trade.</span></h2></div><div class="flow-status"><span class="live-dot"></span> SESSION ${state.status.replaceAll("_", " ")}</div></div><div class="status-line">${renderStatusLine()}</div>
+        <section class="panel line-panel"><div class="panel-heading"><div><span class="section-kicker">01 · DRAW THE LINE</span><h2>What are you willing to risk?</h2></div><span class="source-pill">USER AUTHORED</span></div><div class="preset-grid">${renderPresets()}</div><div class="limits-grid"><label>MAX POSITION <span>your wallet %</span><input data-field="maxPositionBps" type="range" min="25" max="500" step="25" value="${state.draft.maxPositionBps}" /><output>${formatBps(state.draft.maxPositionBps)}</output></label><label>MINIMUM OUTPUT <span>vs 33.320629 USDC quote</span><input data-field="minOutputBps" type="range" min="9500" max="9950" step="50" value="${state.preset.minOutputBps}" /><output>${formatOutput(state.draft.minOutput)}</output></label><label>RECEIPT EXPIRES <span>time to decide</span><select data-field="expiryMinutes"><option value="5">in 5 minutes</option><option value="10" selected>in 10 minutes</option><option value="15">in 15 minutes</option></select><output>${formatTime(state.draft.expiry)}</output></label></div><label class="reason-field">WHY THIS TRADE? <span>private note · max 140 chars</span><textarea data-field="reason" maxlength="140">${escapeHtml(state.draft.reason)}</textarea></label><div class="line-footer"><div class="commitment"><span class="lock">⌁</span><span><b>Your rule becomes a commitment.</b><small>hashed into Receipt v1 · nonce ${state.draft.nonce.slice(0, 10)}…</small></span></div><button class="secondary-button" data-action="refresh-risk">Refresh risk brief <span>↻</span></button></div></section>
+        ${renderRiskBrief()}
+        <section class="panel sign-panel"><div class="panel-heading"><div><span class="section-kicker">03 · SIGN THE RECEIPT</span><h2>Pause before the point of no return.</h2></div><span class="source-pill">WALLET BOUNDARY</span></div><div class="sign-copy"><div class="sign-quote">“I know what would make this trade a bad idea — and I’m choosing this line anyway.”</div><div class="sign-details"><span><b>MAX INPUT</b>${formatInput(state.draft.maxInput)}</span><span><b>MIN OUTPUT</b>${formatOutput(state.draft.minOutput)}</span><span><b>EXPIRES</b>${formatTime(state.draft.expiry)}</span></div></div><div class="sign-footer"><p>Redline cannot sign or execute this trade.<br /><strong>Your wallet remains in control.</strong></p><button class="primary-button" data-action="sign">${state.status === STATUS.SIGNED ? "Receipt signed ✓" : "Sign Decision Receipt"} <span>↗</span></button></div></section>
+        <section class="panel proof-panel"><div class="panel-heading"><div><span class="section-kicker">04 · LET FLARE JUDGE</span><h2>Proof, not vibes.</h2></div><div class="proof-tabs"><button class="${state.activeTab === "held" ? "active" : ""}" data-replay="held">HELD</button><button class="${state.activeTab === "crossed" ? "active" : ""}" data-replay="crossed">CROSSED</button><button class="${state.activeTab === "live" ? "active" : ""}" data-action="live">LIVE FDC</button></div></div>${renderEvidence()}<div class="proof-actions"><button class="secondary-button" data-replay="held">Replay held line <span>↗</span></button><button class="danger-button" data-replay="crossed">Replay crossed line <span>↗</span></button></div></section>
+        ${renderAccountability()}
+      </section>
+    </main>
+    <footer class="footer"><span>REDLINE RECEIPT · Coston2 prototype</span><span>AI explains. Flare verifies. You decide.</span><a href="https://dev.flare.network/fdc/overview" target="_blank" rel="noreferrer">FDC docs ↗</a></footer>
+    ${state.toast ? `<div class="toast ${state.toast.tone}">${escapeHtml(state.toast.message)}</div>` : ""}
+  </div>`;
+}
+
+app.addEventListener("click", (event) => {
+  const preset = event.target.closest("[data-preset]");
+  if (preset) return selectPreset(preset.dataset.preset);
+  const replayButton = event.target.closest("[data-replay]");
+  if (replayButton) return replay(replayButton.dataset.replay);
+  const action = event.target.closest("[data-action]")?.dataset.action;
+  if (action === "connect") return connectWallet();
+  if (action === "sign") return signReceipt();
+  if (action === "live") return showLiveReceipt();
+  if (action === "refresh-risk") { syncRisk(); showToast("Risk Capsule refreshed · snapshot is fixture-labeled", "info"); return; }
+  if (action === "copy") { navigator.clipboard?.writeText(`${location.origin}/receipt/${state.draft.nonce}`); showToast("Receipt link copied", "success"); }
+});
+
+app.addEventListener("input", (event) => {
+  const field = event.target.dataset.field;
+  if (!field) return;
+  if (field === "maxPositionBps") updateField(field, event.target.value);
+  if (field === "reason") updateField(field, event.target.value);
+});
+
+app.addEventListener("change", (event) => {
+  const field = event.target.dataset.field;
+  if (field === "minOutputBps") {
+    state.preset = { ...state.preset, minOutputBps: Number(event.target.value) };
+    state.draft.minOutput = String(Math.floor(DEMO_QUOTED_OUTPUT * Number(event.target.value) / 10_000));
+    syncRisk();
+    render();
+  }
+  if (field === "expiryMinutes") {
+    state.draft.expiry = Math.floor(Date.now() / 1000) + Number(event.target.value) * 60;
+    render();
+  }
+});
+
+syncRisk();
+render();

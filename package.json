@@ -1,0 +1,18 @@
+{
+  "name": "redline-receipt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Redline Receipt — a Flare-powered pre-trade decision guardrail.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "fdc:prepare": "node --env-file=.env scripts/fdc/prepare-request.mjs",
+    "fdc:submit": "node --env-file=.env scripts/fdc/submit-request.mjs",
+    "fdc:proof": "node --env-file=.env scripts/fdc/get-proof.mjs",
+    "fdc:pack-proof": "node --env-file=.env scripts/fdc/pack-proof.mjs",
+    "deploy:coston2": "node --env-file=.env scripts/deploy-coston2.mjs",
+    "receipt:submit": "node --env-file=.env scripts/receipt/submit-receipt.mjs",
+    "receipt:verify": "node --env-file=.env scripts/receipt/verify-receipt.mjs"
+  }
+}
