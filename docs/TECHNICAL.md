@@ -81,6 +81,7 @@ All quantities are integer base units. Long user notes and risk outputs remain o
 ```solidity
 struct ExternalFacts {
     uint256 externalChainId;
+    address trader;
     address router;
     address tokenIn;
     address tokenOut;
@@ -109,7 +110,7 @@ receiptId = keccak256(abi.encode(all Receipt fields))
 1. Reject missing or consumed Receipts.
 2. Mark expired Receipts as `EXPIRED`.
 3. Ask the verifier for normalized facts; reject invalid proofs.
-4. Mark a chain, router, or asset mismatch as `MISMATCHED`.
+4. Mark a trader, chain, router, or asset mismatch as `MISMATCHED`.
 5. Compare `amountIn <= maxInput` and `amountOut >= minOutput`.
 6. Mark the Receipt consumed and emit `LINE_HELD` or `LINE_CROSSED`.
 
@@ -130,18 +131,21 @@ receiptId = keccak256(abi.encode(all Receipt fields))
 
 | Component | Address / transaction |
 |---|---|
-| `FdcEvmTransactionVerifier` | [`0x0aeA880F18232fE82EdA800a874F5CbE99dd5693`](https://coston2-explorer.flare.network/address/0x0aeA880F18232fE82EdA800a874F5CbE99dd5693) |
-| `RedlineReceipt` | [`0x01Dd46c45c7d5fC805B93CD331d6FaA60C735B74`](https://coston2-explorer.flare.network/address/0x01Dd46c45c7d5fC805B93CD331d6FaA60C735B74) |
-| Adapter deployment | [`0x6d58…90e1`](https://coston2-explorer.flare.network/tx/0x6d580b2467d81d87195783a7fcbea40392f3e1e769f6e80b3243d85d611390e1) |
-| Receipt deployment | [`0x2806…9dcf`](https://coston2-explorer.flare.network/tx/0x280699f42164faf3636326b57e445367d41948102a8e025b95247aab25999dcf) |
+| `FdcEvmTransactionVerifier` | [`0x33eE082EC11590E4386Ce9747F00801653dA39cA`](https://coston2-explorer.flare.network/address/0x33eE082EC11590E4386Ce9747F00801653dA39cA) |
+| `RedlineReceipt` | [`0x9D5f42Cb63CC8B241f3216fd4CC0c48BE11Da602`](https://coston2-explorer.flare.network/address/0x9D5f42Cb63CC8B241f3216fd4CC0c48BE11Da602) |
+| Adapter deployment | [`0x81bb…5cb7`](https://coston2-explorer.flare.network/tx/0x81bb854e05491f1382eb9ee6a0f110cef6f88af4124c18638b028442ac355cb7) |
+| Receipt deployment | [`0x5632…f7da`](https://coston2-explorer.flare.network/tx/0x5632650b233cc32f43811faa2f15afa04b97cfbed6cbbed274930fb32dabf7da) |
 | Source swap | [Sepolia `0xf85d…dcb4`](https://sepolia.etherscan.io/tx/0xf85d179a409f364e3bfea157155484cec869f7b61df81784b60cdab84eb1dcb4) |
-| Receipt and verdict | [Coston2 `0xdafa…41e2`](https://coston2-explorer.flare.network/tx/0xdafac332ea09369949906ae4ae14227d46d9469460e43972f30c7b345f3641e2) |
+| Receipt and verdict | [Coston2 `0xef01…8eb6`](https://coston2-explorer.flare.network/tx/0xef01a47c3da8aa34df89397e7c3485fae4e0fb587400e00ce690433e7b378eb6) |
+| Crossed Receipt | [Coston2 `0x30ea…8198`](https://coston2-explorer.flare.network/tx/0xcaba51264c59d386682dade483e3fb95ac50d2dba89b634ced0fbfd127f52f0b) |
+| Crossed verdict | [Coston2 `0xd514…c700`](https://coston2-explorer.flare.network/tx/0xd514c58bed2864783e0ca8d04bb8cf1a810c9d47d39758c9ead21e6e984ec700) |
 
 The verified proof came from FDC round `1425147` and contained three Merkle nodes. The adapter returned:
 
 ```text
 verified          true
 externalChainId   11155111
+trader            0xB675d67909185f5E983EC51b2AED14667eA31b33
 router            0x7DfD4F31be6814D2906BDE155c3e1B146EAc1468
 tokenIn           0x0000000000000000000000000000000000000000
 tokenOut          0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
@@ -150,6 +154,8 @@ amountOut         33320629               (33.320629 USDC)
 ```
 
 The Receipt committed `maxInput=1000000000000000` and `minOutput=30000000`, so the contract emitted `LINE_HELD` with status code `3`.
+
+For the crossed path, a second Receipt committed the same route but a tighter `maxInput=500000000000000` (`0.0005 ETH`) while the same FDC-verified facts showed `amountIn=1000000000000000` (`0.001 ETH`). The contract correctly emitted `LINE_CROSSED` with status code `4`.
 
 ## 6. FDC workflow
 
@@ -226,7 +232,7 @@ Run all local tests with `npm test && forge test`.
 
 ## 10. Known limitations and next steps
 
-The live path is intentionally narrow. A second real crossed path, a hosted frontend, and a video are still required for the strongest submission. Future work can support more FDC transaction shapes, additional external networks, FAssets-based assets, and privacy-sensitive rule evaluation through FCC.
+The live path is intentionally narrow. The on-chain verdict now binds the external transaction's `sourceAddress` to the Receipt trader, but `maxPositionBps` is still a UI-only position framing; the contract enforces `maxInput` and `minOutput` in absolute units. A second real crossed path and the demo video are still required for the strongest submission. Future work can support more FDC transaction shapes, additional external networks, FAssets-based assets, and privacy-sensitive rule evaluation through FCC.
 
 ## References
 

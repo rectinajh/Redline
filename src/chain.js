@@ -49,6 +49,52 @@ export function encodeSubmitReceipt(receipt) {
   return `${SUBMIT_RECEIPT_SELECTOR}${values.join("")}`;
 }
 
+export const COSTON2_NETWORK = {
+  chainId: `0x${COSTON2_CHAIN_ID.toString(16)}`,
+  chainName: "Coston2",
+  nativeCurrency: { name: "Coston2 Flare", symbol: "C2FLR", decimals: 18 },
+  rpcUrls: [COSTON2_RPC_URL],
+  blockExplorerUrls: ["https://coston2-explorer.flare.network"],
+};
+
+export function getInjectedProvider() {
+  if (typeof window === "undefined") return null;
+  const { ethereum } = window;
+  if (!ethereum?.request) return null;
+  if (Array.isArray(ethereum.providers) && ethereum.providers.length) {
+    return ethereum.providers.find((provider) => provider.isMetaMask)
+      || ethereum.providers.find((provider) => provider.request)
+      || null;
+  }
+  return ethereum;
+}
+
+export async function ensureCoston2(provider = getInjectedProvider()) {
+  if (!provider?.request) throw new Error("Install MetaMask and open this app in Chrome or Brave");
+  const chainId = Number.parseInt(await provider.request({ method: "eth_chainId" }), 16);
+  if (chainId === COSTON2_CHAIN_ID) return chainId;
+  try {
+    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: COSTON2_NETWORK.chainId }] });
+  } catch (error) {
+    if (error?.code === 4902) {
+      await provider.request({ method: "wallet_addEthereumChain", params: [COSTON2_NETWORK] });
+    } else {
+      throw error;
+    }
+  }
+  return Number.parseInt(await provider.request({ method: "eth_chainId" }), 16);
+}
+
+export async function connectInjectedWallet() {
+  const provider = getInjectedProvider();
+  if (!provider) {
+    throw new Error("No browser wallet found. Install MetaMask and open this page in Chrome or Brave, not the IDE preview.");
+  }
+  const accounts = await provider.request({ method: "eth_requestAccounts" });
+  const chainId = await ensureCoston2(provider);
+  return { provider, address: accounts[0], chainId };
+}
+
 async function rpc(method, params = []) {
   const response = await fetch(COSTON2_RPC_URL, {
     method: "POST",
@@ -111,11 +157,10 @@ async function waitForTransaction(transactionHash, timeoutMs = 45_000) {
   throw new Error("Coston2 transaction confirmation timed out");
 }
 
-export async function publishReceipt(receipt, walletAddress) {
-  if (!window.ethereum?.request) throw new Error("A browser wallet is required to publish on Coston2");
-  const chainId = Number.parseInt(await window.ethereum.request({ method: "eth_chainId" }), 16);
-  if (chainId !== COSTON2_CHAIN_ID) throw new Error("Switch your wallet to Coston2 before publishing");
-  const transactionHash = await window.ethereum.request({
+export async function publishReceipt(receipt, walletAddress, provider = getInjectedProvider()) {
+  if (!provider?.request) throw new Error("A browser wallet is required to publish on Coston2");
+  await ensureCoston2(provider);
+  const transactionHash = await provider.request({
     method: "eth_sendTransaction",
     params: [{ from: walletAddress, to: REDLINE_RECEIPT_CONTRACT, data: encodeSubmitReceipt(receipt) }],
   });

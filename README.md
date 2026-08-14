@@ -22,10 +22,12 @@ Sepolia ETH → USDC swap
 |---|---|
 | Bounty | Bounty 1: Interoperable Asset Products |
 | Flare network | Coston2, Chain ID `114` |
-| FDC adapter | [`0x0aeA…5693`](https://coston2-explorer.flare.network/address/0x0aeA880F18232fE82EdA800a874F5CbE99dd5693) |
-| Receipt contract | [`0x01Dd…5B74`](https://coston2-explorer.flare.network/address/0x01Dd46c45c7d5fC805B93CD331d6FaA60C735B74) |
-| Live Receipt | [`0x2118…ec24`](https://coston2-explorer.flare.network/tx/0xdafac332ea09369949906ae4ae14227d46d9469460e43972f30c7b345f3641e2) |
-| Final verdict | [`LINE_HELD`](https://coston2-explorer.flare.network/tx/0xdafac332ea09369949906ae4ae14227d46d9469460e43972f30c7b345f3641e2) |
+| FDC adapter | [`0x33eE…39cA`](https://coston2-explorer.flare.network/address/0x33eE082EC11590E4386Ce9747F00801653dA39cA) |
+| Receipt contract | [`0x9D5f…a602`](https://coston2-explorer.flare.network/address/0x9D5f42Cb63CC8B241f3216fd4CC0c48BE11Da602) |
+| Live Receipt | [`0x8c58…1046`](https://coston2-explorer.flare.network/tx/0x23a15bbea6a85bacbb6a1321d039c653b0c685280e94f07f37c4e609eacbc1a8) |
+| Final verdict | [`LINE_HELD`](https://coston2-explorer.flare.network/tx/0xef01a47c3da8aa34df89397e7c3485fae4e0fb587400e00ce690433e7b378eb6) |
+| Crossed Receipt | [`0x30ea…8198`](https://coston2-explorer.flare.network/tx/0xcaba51264c59d386682dade483e3fb95ac50d2dba89b634ced0fbfd127f52f0b) |
+| Crossed verdict | [`LINE_CROSSED`](https://coston2-explorer.flare.network/tx/0xd514c58bed2864783e0ca8d04bb8cf1a810c9d47d39758c9ead21e6e984ec700) |
 | External source transaction | [Sepolia transaction](https://sepolia.etherscan.io/tx/0xf85d179a409f364e3bfea157155484cec869f7b61df81784b60cdab84eb1dcb4) |
 | FDC voting round | `1425147` |
 | Verified facts | `0.001 ETH` in, `33.320629 USDC` out |
@@ -40,7 +42,7 @@ The Receipt binds:
 
 1. A maximum input and/or maximum position size.
 2. A minimum output.
-3. The intended chain, router, assets, expiry, and nonce.
+3. The intended trader, chain, router, assets, expiry, and nonce.
 
 Only a verified FDC proof can produce a final on-chain verdict. Missing or unsupported evidence remains `UNVERIFIED`; the app never turns unknown facts into a safety claim.
 
@@ -111,7 +113,7 @@ The deployment script deploys the FDC adapter first, then the immutable Receipt 
 - Optional server-side structured AI explanation grounded only in Receipt and FDC facts.
 - Presets for small probes, known routers, and cooling-off trades.
 - A fixture `LINE_HELD` and `LINE_CROSSED` replay for the UI.
-- A real `LIVE FDC` card for the deployed Coston2 `LINE_HELD` receipt.
+- Real `LIVE FDC` cards for both deployed Coston2 `LINE_HELD` and `LINE_CROSSED` receipts.
 - Solidity contracts and Foundry tests for held, crossed, mismatched, expired, and replay paths.
 - Scripts for FDC request preparation, submission, proof polling, proof packing, deployment, Receipt submission, and verdict verification.
 
@@ -140,7 +142,7 @@ The deployment script deploys the FDC adapter first, then the immutable Receipt 
 | Flare usage | FDC verifies external EVM facts; Coston2 contracts write the final Receipt verdict |
 | New work | Receipt commitment, FDC adapter, proof packing, verdict contracts, risk UX, live proof card, public evidence model |
 | GitHub | [rectinajh/Redline](https://github.com/rectinajh/Redline) |
-| Public app | To be published |
+| Public app | [redline-receipt.vercel.app](https://redline-receipt.vercel.app) |
 | Demo video | To be recorded |
 
 ## Roadmap

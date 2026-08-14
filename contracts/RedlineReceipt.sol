@@ -11,6 +11,7 @@ interface IRedlineEvidenceVerifier {
         returns (
             bool verified,
             uint256 externalChainId,
+            address trader,
             address router,
             address tokenIn,
             address tokenOut,
@@ -149,11 +150,11 @@ contract RedlineReceipt {
             return Status.EXPIRED;
         }
 
-        (bool verified, uint256 externalChainId, address router, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut, bytes32 transactionHash) =
+        (bool verified, uint256 externalChainId, address trader, address router, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut, bytes32 transactionHash) =
             IRedlineEvidenceVerifier(verifier).verify(proof);
         if (!verified) revert ProofInvalid();
 
-        if (externalChainId != receipt.chainId || router != receipt.router || tokenIn != receipt.tokenIn || tokenOut != receipt.tokenOut) {
+        if (trader != receipt.trader || externalChainId != receipt.chainId || router != receipt.router || tokenIn != receipt.tokenIn || tokenOut != receipt.tokenOut) {
             consumed[id] = true;
             statusOf[id] = Status.MISMATCHED;
             emit ReceiptVerdict(id, Status.MISMATCHED, transactionHash);

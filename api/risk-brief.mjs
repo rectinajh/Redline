@@ -85,13 +85,16 @@ export default async function handler(request, response) {
         messages: [
           {
             role: "system",
-            content: "You are Redline's evidence explainer. Explain only the supplied Receipt, deterministic checks, and verified FDC facts. Never predict prices, invent facts, assign a safety score, or make the final LINE_HELD/LINE_CROSSED decision. If facts are missing, put that in unknowns. Keep the explanation concise and actionable.",
+            content: [
+              "You are Redline's evidence explainer. Explain only the supplied Receipt, deterministic checks, and verified FDC facts. Never predict prices, invent facts, assign a safety score, or make the final LINE_HELD/LINE_CROSSED decision. If facts are missing, put that in unknowns. Keep the explanation concise and actionable.",
+              "Return only a JSON object matching this exact shape, with no markdown or commentary:",
+              JSON.stringify(schema),
+            ].join("\n"),
           },
           { role: "user", content: buildRiskPrompt(body) },
         ],
         response_format: {
-          type: "json_schema",
-          json_schema: { name: "redline_risk_brief", strict: true, schema },
+          type: "json_object",
         },
       }),
     });

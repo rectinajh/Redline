@@ -4,6 +4,7 @@ import {
   DEMO_QUOTED_OUTPUT,
   INPUT_DECIMALS,
   INPUT_SYMBOL,
+  LIVE_CROSSED_RECEIPT_ID,
   OUTPUT_DECIMALS,
   OUTPUT_SYMBOL,
   PRESETS,
@@ -15,7 +16,7 @@ import {
   runDeterministicChecks,
   shortAddress,
 } from "./core.js";
-import { publishReceipt } from "./chain.js";
+import { connectInjectedWallet, publishReceipt } from "./chain.js";
 import { FixtureAdapter, LiveFdcAdapter } from "./evidence.js";
 
 const app = document.querySelector("#app");
@@ -93,6 +94,7 @@ async function requestRiskBrief() {
 function selectPreset(id) {
   state.preset = PRESETS.find((preset) => preset.id === id) || PRESETS[0];
   state.draft = createDraft(state.preset);
+  if (state.wallet.address) state.draft.trader = state.wallet.address;
   state.status = STATUS.DRAFT;
   state.evidence = null;
   state.verdict = null;
@@ -105,19 +107,11 @@ function selectPreset(id) {
 }
 
 async function connectWallet() {
-  if (!window.ethereum?.request) {
-    state.wallet = { address: "0xDEMO…C0DE", chainId: COSTON2_CHAIN_ID, mode: "DEMO" };
-    showToast("Demo wallet active · no transaction will be broadcast", "info");
-    return;
-  }
   try {
-    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-    const chainHex = await window.ethereum.request({ method: "eth_chainId" });
-    const chainId = Number.parseInt(chainHex, 16);
-    state.wallet = { address: accounts[0], chainId, mode: "WALLET" };
-    state.draft.trader = accounts[0];
-    if (chainId !== COSTON2_CHAIN_ID) showToast("Connected, but switch to Coston2 before signing", "warning");
-    else showToast(`Wallet connected · ${shortAddress(accounts[0])}`, "success");
+    const { address, chainId } = await connectInjectedWallet();
+    state.wallet = { address, chainId, mode: "WALLET" };
+    state.draft.trader = address;
+    showToast(`Wallet connected · ${shortAddress(address)} · Coston2`, "success");
     syncRisk();
     render();
   } catch (error) {
@@ -172,10 +166,12 @@ function replay(kind) {
   }, 1160);
 }
 
-function showLiveReceipt() {
-  state.activeTab = "live";
+function showLiveReceipt(kind = "held") {
+  const isCrossed = kind === "crossed";
+  state.activeTab = isCrossed ? "live-crossed" : "live";
   state.status = STATUS.PROOF_FINALIZED;
-  new LiveFdcAdapter({ receiptId: state.receiptId || undefined }).getEvidence(state.draft).then((evidence) => {
+  const receiptId = isCrossed ? LIVE_CROSSED_RECEIPT_ID : (state.receiptId || undefined);
+  new LiveFdcAdapter({ receiptId }).getEvidence(state.draft).then((evidence) => {
     state.evidence = evidence;
     state.verdict = evaluateVerdict(state.draft, evidence);
     state.status = state.verdict.status;
@@ -244,8 +240,9 @@ function renderEvidence() {
 function renderAccountability() {
   if (!state.verdict || !state.evidence) return "";
   const evidence = state.evidence;
+  const committedMaxInput = evidence.committedMaxInput || state.draft.maxInput;
   return `<section class="panel accountability"><div class="panel-heading"><div><span class="section-kicker">06 · KEEP THE RECORD</span><h2>Accountability Card</h2></div><button class="text-button" data-action="copy">Copy receipt ↗</button></div>
-    <div class="comparison"><div><small>YOUR LINE</small><strong>Max input</strong><span>${formatInput(state.draft.maxInput)}</span></div><div class="comparison-arrow">→</div><div><small>VERIFIED FACT</small><strong>Actual input</strong><span>${formatInput(evidence.amountIn)}</span></div><div class="comparison-result ${state.verdict.status === STATUS.LINE_HELD ? "good" : "bad"}">${state.verdict.status === STATUS.LINE_HELD ? "MATCH" : "CROSSED"}</div></div>
+    <div class="comparison"><div><small>YOUR LINE</small><strong>Max input</strong><span>${formatInput(committedMaxInput)}</span></div><div class="comparison-arrow">→</div><div><small>VERIFIED FACT</small><strong>Actual input</strong><span>${formatInput(evidence.amountIn)}</span></div><div class="comparison-result ${state.verdict.status === STATUS.LINE_HELD ? "good" : "bad"}">${state.verdict.status === STATUS.LINE_HELD ? "MATCH" : "CROSSED"}</div></div>
     <div class="receipt-meta"><span><b>Receipt</b> ${escapeHtml((evidence.receiptId || state.draft.nonce).slice(0, 18))}…</span><span><b>Network</b> Coston2 · 114</span><span><b>Source</b> ${escapeHtml(evidence.provenance)}</span></div>
   </section>`;
 }
@@ -276,7 +273,7 @@ function render() {
         <section class="panel line-panel"><div class="panel-heading"><div><span class="section-kicker">01 · DRAW THE LINE</span><h2>What are you willing to risk?</h2></div><span class="source-pill">USER AUTHORED</span></div><div class="preset-grid">${renderPresets()}</div><div class="limits-grid"><label>MAX POSITION <span>your wallet %</span><input data-field="maxPositionBps" type="range" min="25" max="500" step="25" value="${state.draft.maxPositionBps}" /><output>${formatBps(state.draft.maxPositionBps)}</output></label><label>MINIMUM OUTPUT <span>vs 33.320629 USDC quote</span><input data-field="minOutputBps" type="range" min="9500" max="9950" step="50" value="${state.preset.minOutputBps}" /><output>${formatOutput(state.draft.minOutput)}</output></label><label>RECEIPT EXPIRES <span>time to decide</span><select data-field="expiryMinutes"><option value="5">in 5 minutes</option><option value="10" selected>in 10 minutes</option><option value="15">in 15 minutes</option></select><output>${formatTime(state.draft.expiry)}</output></label></div><label class="reason-field">WHY THIS TRADE? <span>private note · max 140 chars</span><textarea data-field="reason" maxlength="140">${escapeHtml(state.draft.reason)}</textarea></label><div class="line-footer"><div class="commitment"><span class="lock">⌁</span><span><b>Your rule becomes a commitment.</b><small>hashed into Receipt v1 · nonce ${state.draft.nonce.slice(0, 10)}…</small></span></div><button class="secondary-button" data-action="refresh-risk">Refresh risk brief <span>↻</span></button></div></section>
         ${renderRiskBrief()}
         <section class="panel sign-panel"><div class="panel-heading"><div><span class="section-kicker">03 · PUBLISH THE LINE</span><h2>Put your boundary on Flare.</h2></div><span class="source-pill">COSTON2 WRITE</span></div><div class="sign-copy"><div class="sign-quote">“I know what would make this trade a bad idea — and I’m choosing this line anyway.”</div><div class="sign-details"><span><b>MAX INPUT</b>${formatInput(state.draft.maxInput)}</span><span><b>MIN OUTPUT</b>${formatOutput(state.draft.minOutput)}</span><span><b>EXPIRES</b>${formatTime(state.draft.expiry)}</span></div></div><div class="sign-footer"><p>Redline cannot sign or execute the swap.<br /><strong>Your wallet publishes the commitment on Coston2.</strong></p><button class="primary-button" data-action="publish" ${state.status === STATUS.PUBLISHING ? "disabled" : ""}>${state.status === STATUS.ONCHAIN_PUBLISHED ? "Redline published ✓" : state.status === STATUS.PUBLISHING ? "Publishing…" : "Publish Redline on Coston2"} <span>↗</span></button></div>${renderPublishedReceipt()}</section>
-        <section class="panel proof-panel"><div class="panel-heading"><div><span class="section-kicker">04 · LET FLARE JUDGE</span><h2>Proof, not vibes.</h2></div><div class="proof-tabs"><button class="${state.activeTab === "held" ? "active" : ""}" data-replay="held">HELD</button><button class="${state.activeTab === "crossed" ? "active" : ""}" data-replay="crossed">CROSSED</button><button class="${state.activeTab === "live" ? "active" : ""}" data-action="live">LIVE FDC</button></div></div>${renderEvidence()}<div class="proof-actions"><button class="secondary-button" data-replay="held">Replay held line <span>↗</span></button><button class="danger-button" data-replay="crossed">Replay crossed line <span>↗</span></button></div></section>
+        <section class="panel proof-panel"><div class="panel-heading"><div><span class="section-kicker">04 · LET FLARE JUDGE</span><h2>Proof, not vibes.</h2></div><div class="proof-tabs"><button class="${state.activeTab === "held" ? "active" : ""}" data-replay="held">HELD</button><button class="${state.activeTab === "crossed" ? "active" : ""}" data-replay="crossed">CROSSED</button><button class="${state.activeTab === "live" ? "active" : ""}" data-action="live">LIVE FDC</button><button class="${state.activeTab === "live-crossed" ? "active" : ""}" data-action="live-crossed">LIVE CROSSED</button></div></div>${renderEvidence()}<div class="proof-actions"><button class="secondary-button" data-replay="held">Replay held line <span>↗</span></button><button class="danger-button" data-replay="crossed">Replay crossed line <span>↗</span></button></div></section>
         ${renderAccountability()}
       </section>
     </main>
@@ -294,6 +291,7 @@ app.addEventListener("click", (event) => {
   if (action === "connect") return connectWallet();
   if (action === "publish") return publishOnchainReceipt();
   if (action === "live") return showLiveReceipt();
+  if (action === "live-crossed") return showLiveReceipt("crossed");
   if (action === "refresh-risk") { syncRisk(); requestRiskBrief(); return; }
   if (action === "copy") { navigator.clipboard?.writeText(`${location.origin}/receipt/${state.receiptId || state.draft.nonce}`); showToast("Receipt link copied", "success"); }
 });

@@ -86,6 +86,7 @@ contract FdcEvmTransactionVerifier is IRedlineEvidenceVerifier {
         returns (
             bool verified,
             uint256 externalChainId,
+            address trader,
             address router,
             address tokenIn,
             address tokenOut,
@@ -102,13 +103,13 @@ contract FdcEvmTransactionVerifier is IRedlineEvidenceVerifier {
             IFdcEvmTransactionVerification.Proof({merkleProof: merkleProof, data: data});
 
         if (!IFdcEvmTransactionVerificationContract(fdcVerification).verifyEVMTransaction(proof)) {
-            return (false, 0, address(0), address(0), address(0), 0, 0, bytes32(0));
+            return (false, 0, address(0), address(0), address(0), address(0), 0, 0, bytes32(0));
         }
         if (data.attestationType != EVM_TRANSACTION || data.sourceId != TEST_ETH) {
-            return (false, 0, address(0), address(0), address(0), 0, 0, bytes32(0));
+            return (false, 0, address(0), address(0), address(0), address(0), 0, 0, bytes32(0));
         }
         if (data.responseBody.status != 1 || data.responseBody.sourceAddress == address(0)) {
-            return (false, 0, address(0), address(0), address(0), 0, 0, bytes32(0));
+            return (false, 0, address(0), address(0), address(0), address(0), 0, 0, bytes32(0));
         }
 
         address outputToken;
@@ -129,12 +130,13 @@ contract FdcEvmTransactionVerifier is IRedlineEvidenceVerifier {
         }
 
         if (outputToken == address(0) || outputAmount == 0 || data.responseBody.value == 0) {
-            return (false, 0, address(0), address(0), address(0), 0, 0, bytes32(0));
+            return (false, 0, address(0), address(0), address(0), address(0), 0, 0, bytes32(0));
         }
 
         return (
             true,
             SEPOLIA_CHAIN_ID,
+            data.responseBody.sourceAddress,
             data.responseBody.receivingAddress,
             address(0),
             outputToken,

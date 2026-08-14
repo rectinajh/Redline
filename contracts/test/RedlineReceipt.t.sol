@@ -15,7 +15,7 @@ contract RedlineReceiptTest {
 
     function setUp() public {
         mock = new MockEvidenceVerifier();
-        mock.setFacts(true, COSTON2, ROUTER, TOKEN_IN, TOKEN_OUT, 1 ether, 0.98 ether, keccak256("held"));
+        mock.setFacts(true, COSTON2, address(this), ROUTER, TOKEN_IN, TOKEN_OUT, 1 ether, 0.98 ether, keccak256("held"));
         receipt = new RedlineReceipt(COSTON2, address(mock), ROUTER, TOKEN_IN, TOKEN_OUT);
     }
 
@@ -28,7 +28,7 @@ contract RedlineReceiptTest {
     }
 
     function testCrossedVerdict() public {
-        mock.setFacts(true, COSTON2, ROUTER, TOKEN_IN, TOKEN_OUT, 2 ether, 0.9 ether, keccak256("crossed"));
+        mock.setFacts(true, COSTON2, address(this), ROUTER, TOKEN_IN, TOKEN_OUT, 2 ether, 0.9 ether, keccak256("crossed"));
         RedlineReceipt.Receipt memory draft = _draft(2, 0.98 ether, 10 minutes);
         bytes32 id = receipt.submitReceipt(draft);
         RedlineReceipt.Status result = receipt.verifyReceipt(id, hex"02");
@@ -36,11 +36,19 @@ contract RedlineReceiptTest {
     }
 
     function testMismatchVerdict() public {
-        mock.setFacts(true, COSTON2, address(0x9999), TOKEN_IN, TOKEN_OUT, 1 ether, 1 ether, keccak256("mismatch"));
+        mock.setFacts(true, COSTON2, address(this), address(0x9999), TOKEN_IN, TOKEN_OUT, 1 ether, 1 ether, keccak256("mismatch"));
         RedlineReceipt.Receipt memory draft = _draft(3, 0.98 ether, 10 minutes);
         bytes32 id = receipt.submitReceipt(draft);
         RedlineReceipt.Status result = receipt.verifyReceipt(id, hex"03");
         require(result == RedlineReceipt.Status.MISMATCHED, "expected MISMATCHED");
+    }
+
+    function testTraderMismatchVerdict() public {
+        mock.setFacts(true, COSTON2, address(0x9999), ROUTER, TOKEN_IN, TOKEN_OUT, 1 ether, 1 ether, keccak256("trader-mismatch"));
+        RedlineReceipt.Receipt memory draft = _draft(5, 0.98 ether, 10 minutes);
+        bytes32 id = receipt.submitReceipt(draft);
+        RedlineReceipt.Status result = receipt.verifyReceipt(id, hex"05");
+        require(result == RedlineReceipt.Status.MISMATCHED, "expected MISMATCHED for trader mismatch");
     }
 
     function testReplayIsRejected() public {

@@ -96,7 +96,8 @@ The controlled demonstration has completed one real path:
 | External swap | [0xf85d…dcb4](https://sepolia.etherscan.io/tx/0xf85d179a409f364e3bfea157155484cec869f7b61df81784b60cdab84eb1dcb4) |
 | Verified input | `0.001 ETH` |
 | Verified output | `33.320629 USDC` |
-| Receipt verdict | [`LINE_HELD`](https://coston2-explorer.flare.network/tx/0xdafac332ea09369949906ae4ae14227d46d9469460e43972f30c7b345f3641e2) |
+| Receipt verdict | [`LINE_HELD`](https://coston2-explorer.flare.network/tx/0xef01a47c3da8aa34df89397e7c3485fae4e0fb587400e00ce690433e7b378eb6) |
+| Crossed verdict | [`LINE_CROSSED`](https://coston2-explorer.flare.network/tx/0xd514c58bed2864783e0ca8d04bb8cf1a810c9d47d39758c9ead21e6e984ec700) · committed maxInput `0.0005 ETH` vs verified `0.001 ETH` |
 
 ## 8. Acceptance criteria
 
@@ -112,9 +113,9 @@ The controlled demonstration has completed one real path:
 
 ### P1
 
-- [ ] Publish a non-localhost app URL.
+- [x] Publish a non-localhost app URL.
 - [ ] Record the 60–90 second demo video.
-- [ ] Add a second live transaction that produces `LINE_CROSSED`.
+- [x] Produce a real on-chain `LINE_CROSSED` verdict from FDC-verified facts (a tighter committed maxInput judged against the same verified swap).
 
 ## 9. Demo outline
 
@@ -134,5 +135,5 @@ The controlled demonstration has completed one real path:
 **Target users:** DeFi traders seeking discipline without giving up wallet control.
 **How Flare is used:** FDC imports verifiable external EVM facts; Coston2 contracts compare them with the Receipt and write the verdict.
 **New work:** FDC proof adapter, immutable Receipt contract, proof-packing scripts, risk UX, live evidence card, fixture replays, and replay protection.
-**Contracts:** [adapter](https://coston2-explorer.flare.network/address/0x0aeA880F18232fE82EdA800a874F5CbE99dd5693), [Receipt](https://coston2-explorer.flare.network/address/0x01Dd46c45c7d5fC805B93CD331d6FaA60C735B74).
+**Contracts:** [adapter](https://coston2-explorer.flare.network/address/0x33eE082EC11590E4386Ce9747F00801653dA39cA), [Receipt](https://coston2-explorer.flare.network/address/0x9D5f42Cb63CC8B241f3216fd4CC0c48BE11Da602).
 **Short-term roadmap:** publish the app, add a real crossed path, then extend supported FDC routes and consider privacy-sensitive logic with FCC.

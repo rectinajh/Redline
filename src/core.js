@@ -1,7 +1,7 @@
 export const COSTON2_CHAIN_ID = 114;
 export const COSTON2_RPC_URL = "https://coston2-api.flare.network/ext/C/rpc";
 export const SEPOLIA_CHAIN_ID = 11155111;
-export const REDLINE_RECEIPT_CONTRACT = "0x01Dd46c45c7d5fC805B93CD331d6FaA60C735B74";
+export const REDLINE_RECEIPT_CONTRACT = "0x9D5f42Cb63CC8B241f3216fd4CC0c48BE11Da602";
 // The controlled MVP route is a real Sepolia ETH -> USDC transaction shape.
 // Fixture replay remains explicitly labeled; these values also match Coston2 deploy defaults.
 export const DEMO_ROUTER = "0x7DfD4F31be6814D2906BDE155c3e1B146EAc1468";
@@ -12,8 +12,10 @@ export const OUTPUT_SYMBOL = "USDC";
 export const INPUT_DECIMALS = 18;
 export const OUTPUT_DECIMALS = 6;
 export const DEMO_QUOTED_OUTPUT = 33_320_629; // 33.320629 Sepolia USDC units
-export const LIVE_RECEIPT_ID = "0x21185fd8e0fccc729d85df9ad8aaa9e558bc7e70c1b06c8ea24ad98e5441ec24";
-export const LIVE_VERDICT_TX = "0xdafac332ea09369949906ae4ae14227d46d9469460e43972f30c7b345f3641e2";
+export const LIVE_RECEIPT_ID = "0x8c58c224f9dbdcce17761fb68ddef524ea333d76b8cc70b9e1d3bb45d6021046";
+export const LIVE_VERDICT_TX = "0xef01a47c3da8aa34df89397e7c3485fae4e0fb587400e00ce690433e7b378eb6";
+export const LIVE_CROSSED_RECEIPT_ID = "0x30ea8c69294a96295e1b0279e5a29d2d11174cc02a83e694ffd6c59ce9538198";
+export const LIVE_CROSSED_VERDICT_TX = "0xd514c58bed2864783e0ca8d04bb8cf1a810c9d47d39758c9ead21e6e984ec700";
 export const LIVE_EXTERNAL_TX = "0xf85d179a409f364e3bfea157155484cec869f7b61df81784b60cdab84eb1dcb4";
 
 export const STATUS = Object.freeze({
@@ -253,8 +255,12 @@ export function evaluateVerdict(draft, evidence) {
 export function createLiveEvidence({ receiptId = LIVE_RECEIPT_ID, onchain = { status: STATUS.LINE_HELD, statusCode: 3, receipt: null } } = {}) {
   const onchainStatus = onchain.status;
   const receipt = onchain.receipt || {};
-  const isKnownLive = receiptId.toLowerCase() === LIVE_RECEIPT_ID.toLowerCase();
+  const normalizedId = receiptId.toLowerCase();
+  const isKnownHeld = normalizedId === LIVE_RECEIPT_ID.toLowerCase();
+  const isKnownCrossed = normalizedId === LIVE_CROSSED_RECEIPT_ID.toLowerCase();
+  const isKnownLive = isKnownHeld || isKnownCrossed;
   const hasVerdict = onchainStatus === STATUS.LINE_HELD || onchainStatus === STATUS.LINE_CROSSED;
+  const liveVerdictTx = isKnownCrossed ? LIVE_CROSSED_VERDICT_TX : LIVE_VERDICT_TX;
   return {
     schemaVersion: "evidence.v1",
     provenance: isKnownLive && hasVerdict ? "LIVE" : "ONCHAIN",
@@ -268,8 +274,10 @@ export function createLiveEvidence({ receiptId = LIVE_RECEIPT_ID, onchain = { st
     tokenOut: receipt.tokenOut || DEMO_TOKEN_OUT,
     amountIn: isKnownLive ? "1000000000000000" : "0",
     amountOut: isKnownLive ? "33320629" : "0",
+    committedMaxInput: receipt.maxInput || "",
+    committedMinOutput: receipt.minOutput || "",
     receiptId,
-    verdictUrl: isKnownLive && hasVerdict ? `https://coston2-explorer.flare.network/tx/${LIVE_VERDICT_TX}` : "",
+    verdictUrl: isKnownLive && hasVerdict ? `https://coston2-explorer.flare.network/tx/${liveVerdictTx}` : "",
     externalTxUrl: isKnownLive ? `https://sepolia.etherscan.io/tx/${LIVE_EXTERNAL_TX}` : "",
     proofReference: "FDC round 1425147 · Coston2 receipt state",
     onchainStatus,

@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encodeSubmitReceipt } from "../src/chain.js";
-import { PRESETS, createDraft } from "../src/core.js";
+import { COSTON2_NETWORK, encodeSubmitReceipt } from "../src/chain.js";
+import { COSTON2_CHAIN_ID, PRESETS, createDraft } from "../src/core.js";
+
+test("Coston2 network metadata matches chain id 114", () => {
+  assert.equal(COSTON2_NETWORK.chainId, "0x72");
+  assert.equal(Number.parseInt(COSTON2_NETWORK.chainId, 16), COSTON2_CHAIN_ID);
+});
 
 test("browser Receipt publisher encodes the deployed static tuple", () => {
   const draft = createDraft(PRESETS[0]);

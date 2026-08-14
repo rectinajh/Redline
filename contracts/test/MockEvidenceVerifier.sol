@@ -6,6 +6,7 @@ import {IRedlineEvidenceVerifier} from "../RedlineReceipt.sol";
 contract MockEvidenceVerifier is IRedlineEvidenceVerifier {
     bool public verified = true;
     uint256 public externalChainId = 114;
+    address public trader;
     address public router;
     address public tokenIn;
     address public tokenOut;
@@ -16,6 +17,7 @@ contract MockEvidenceVerifier is IRedlineEvidenceVerifier {
     function setFacts(
         bool verified_,
         uint256 externalChainId_,
+        address trader_,
         address router_,
         address tokenIn_,
         address tokenOut_,
@@ -25,6 +27,7 @@ contract MockEvidenceVerifier is IRedlineEvidenceVerifier {
     ) external {
         verified = verified_;
         externalChainId = externalChainId_;
+        trader = trader_;
         router = router_;
         tokenIn = tokenIn_;
         tokenOut = tokenOut_;
@@ -36,8 +39,8 @@ contract MockEvidenceVerifier is IRedlineEvidenceVerifier {
     function verify(bytes calldata)
         external
         view
-        returns (bool, uint256, address, address, address, uint256, uint256, bytes32)
+        returns (bool, uint256, address, address, address, address, uint256, uint256, bytes32)
     {
-        return (verified, externalChainId, router, tokenIn, tokenOut, amountIn, amountOut, transactionHash);
+        return (verified, externalChainId, trader, router, tokenIn, tokenOut, amountIn, amountOut, transactionHash);
     }
 }

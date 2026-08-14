@@ -59,6 +59,7 @@ contract FdcEvmTransactionVerifierTest {
         (
             bool verified,
             uint256 chainId,
+            address trader,
             address router,
             address tokenIn,
             address tokenOut,
@@ -69,6 +70,7 @@ contract FdcEvmTransactionVerifierTest {
 
         require(verified, "not verified");
         require(chainId == 11_155_111, "wrong chain");
+        require(trader == TRADER, "wrong trader");
         require(router == ROUTER, "wrong router");
         require(tokenIn == address(0), "wrong input token");
         require(tokenOut == USDC, "wrong output token");
@@ -87,7 +89,7 @@ contract FdcEvmTransactionVerifierTest {
         response.requestBody.logIndices = new uint32[](0);
         response.responseBody.events = new IFdcEvmTransactionVerification.Event[](0);
         bytes memory packedProof = abi.encode(new bytes32[](0), abi.encode(response));
-        (bool verified,,,,,,,) = verifier.verify(packedProof);
+        (bool verified,,,,,,,,) = verifier.verify(packedProof);
         require(!verified, "unsupported proof accepted");
     }
 }
