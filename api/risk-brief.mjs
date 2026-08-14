@@ -5,16 +5,39 @@ const schema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    score: { type: "number", minimum: 0, maximum: 100 },
+    riskLevel: { type: "string", enum: ["WATCH", "ELEVATED", "BLOCKED"] },
     summary: { type: "string" },
     reasons: { type: "array", items: { type: "string" } },
     unknowns: { type: "array", items: { type: "string" } },
     action: { type: "string" },
   },
-  required: ["summary", "reasons", "unknowns", "action"],
+  required: ["score", "riskLevel", "summary", "reasons", "unknowns", "action"],
 };
 
 const text = (value, fallback = "") => typeof value === "string" ? value.trim().slice(0, 500) : fallback;
 const stringArray = (value) => Array.isArray(value) ? value.filter((item) => typeof item === "string").map((item) => item.trim().slice(0, 240)).slice(0, 4) : [];
+const RISK_LEVELS = ["WATCH", "ELEVATED", "BLOCKED"];
+
+function clampScore(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 50;
+  return Math.max(0, Math.min(100, Math.round(number)));
+}
+
+function riskLevelFor(value, score) {
+  if (RISK_LEVELS.includes(value)) return value;
+  return score >= 80 ? "BLOCKED" : score >= 60 ? "ELEVATED" : "WATCH";
+}
+
+function sanitizeText(value) {
+  return String(value || "")
+    .replace(/\b(sepolia|coston2?|testnet|test\s*eth)\b/gi, "")
+    .replace(/\b(chain\s*id\s*\d+|11155111|114)\b/gi, "")
+    .replace(/\b0x[a-fA-F0-9]{8,}\b/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 export function getAiConfig(env = process.env) {
   const baseUrl = (env.AI_BASE_URL || env.BASE_URL || env.OPENAI_BASE_URL || DEFAULT_AI_BASE_URL).replace(/\/+$/, "");
@@ -35,13 +58,17 @@ export function buildRiskPrompt(body) {
 }
 
 export function normalizeRiskBrief(value, model) {
+  const score = clampScore(value?.score);
+  const riskLevel = riskLevelFor(value?.riskLevel, score);
   return {
     status: "LIVE",
     modelVersion: text(model, "configured-model"),
-    summary: text(value?.summary, "The model returned no explanation."),
-    reasons: stringArray(value?.reasons),
-    unknowns: stringArray(value?.unknowns),
-    action: text(value?.action, "Review the verified facts before signing."),
+    score,
+    riskLevel,
+    summary: sanitizeText(value?.summary) || "The model returned no explanation.",
+    reasons: stringArray(value?.reasons).map(sanitizeText).filter(Boolean),
+    unknowns: stringArray(value?.unknowns).map(sanitizeText).filter(Boolean),
+    action: sanitizeText(value?.action) || "Review the verified facts before signing.",
     confidence: null,
     basedOn: "Receipt + deterministic checks + supplied FDC facts",
     generatedAt: new Date().toISOString(),
@@ -86,8 +113,10 @@ export default async function handler(request, response) {
           {
             role: "system",
             content: [
-              "You are Redline's evidence explainer. Explain only the supplied Receipt, deterministic checks, and verified FDC facts. Never predict prices, invent facts, assign a safety score, or make the final LINE_HELD/LINE_CROSSED decision. If facts are missing, put that in unknowns. Keep the explanation concise and actionable.",
-              "Return only a JSON object matching this exact shape, with no markdown or commentary:",
+              "You are Redline's risk analyst for a high-stakes trading checkpoint. Judge the supplied Receipt, deterministic checks, and verified facts as if this is a live production trade, not a sandbox.",
+              "Return a single JSON object matching the schema. Give a 0-100 risk score and one riskLevel of WATCH, ELEVATED, or BLOCKED. Write a sharp, opinionated summary and reasons using realistic market language (for example: momentum already +70%, FOMO entry, asymmetric downside, liquidity and slippage risk).",
+              "Never mention testnets, Sepolia, Coston2, chain IDs, contract addresses, or 0x hashes. Do not make the final LINE_HELD/LINE_CROSSED decision; only on-chain FDC verification does that.",
+              "Schema:",
               JSON.stringify(schema),
             ].join("\n"),
           },

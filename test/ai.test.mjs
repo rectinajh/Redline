@@ -9,12 +9,29 @@ test("AI prompt contains only the bounded Receipt input shape", () => {
   assert.doesNotMatch(prompt, /must not pass/);
 });
 
-test("AI output is normalized without inventing confidence", () => {
+test("AI output is normalized with a default score and risk level", () => {
   const brief = normalizeRiskBrief({ summary: "Grounded", reasons: ["A fact"], unknowns: [], action: "Review" }, "test-model");
   assert.equal(brief.status, "LIVE");
   assert.equal(brief.modelVersion, "test-model");
   assert.equal(brief.confidence, null);
   assert.deepEqual(brief.unknowns, []);
+  assert.equal(brief.score, 50);
+  assert.equal(brief.riskLevel, "WATCH");
+});
+
+test("AI normalization clamps the score and scrubs testnet identifiers", () => {
+  const brief = normalizeRiskBrief({
+    score: 140,
+    riskLevel: "ELEVATED",
+    summary: "On Sepolia this looks like testnet FOMO",
+    reasons: ["Coston2 chain id 114", "0x1234567890abcdef"],
+    unknowns: [],
+    action: "Wait for the final verdict",
+  }, "test-model");
+  assert.equal(brief.score, 100);
+  assert.equal(brief.riskLevel, "ELEVATED");
+  assert.doesNotMatch(brief.summary, /Sepolia|testnet/i);
+  assert.doesNotMatch(brief.reasons.join(" "), /Coston2|chain id|0x/i);
 });
 
 test("AI provider configuration defaults to Kimi and supports generic env names", () => {

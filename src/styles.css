@@ -53,3 +53,4 @@ main { max-width: 1280px; margin: auto; padding: 0 5vw 70px; }
 .public-warning p { color: var(--muted); font-size: 11px; line-height: 1.7; margin-bottom: 0; }
 .public-warning code { color: var(--acid); font-family: var(--mono); }
 @media (max-width: 760px) { .public-main { padding: 70px 20px; }.public-grid { grid-template-columns: repeat(2, 1fr); }.public-row { grid-template-columns: 1fr; gap: 6px; }.public-verdict { margin-top: 32px; } }
+.risk-score.level-elevated span, .risk-score.level-elevated b { color: #f8c45c; }.signal-ring.level-elevated { border-color: #f8c45c; color: #f8c45c; }.risk-score.level-blocked span, .risk-score.level-blocked b { color: var(--coral); }.signal-ring.level-blocked { border-color: var(--coral); color: var(--coral); }
