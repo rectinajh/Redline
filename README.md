@@ -63,9 +63,9 @@ Prerequisites: Node.js, Foundry (`forge` and `cast`), and a Coston2-funded test 
 npm start
 # http://localhost:4173
 
-# Optional: enable the live AI evidence explainer locally.
-# Keep OPENAI_API_KEY server-side; the contract verdict never depends on it.
-OPENAI_API_KEY=... npm start
+# Optional: enable the live Kimi/Moonshot evidence explainer locally.
+# Keep AI_API_KEY server-side; the contract verdict never depends on it.
+AI_API_KEY=... AI_BASE_URL=https://api.moonshot.cn/v1 AI_MODEL=moonshot-v1-8k npm start
 
 npm test
 forge test

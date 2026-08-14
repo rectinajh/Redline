@@ -1,5 +1,5 @@
 const MAX_BODY_BYTES = 32_000;
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const DEFAULT_AI_BASE_URL = "https://api.moonshot.cn/v1";
 
 const schema = {
   type: "object",
@@ -15,6 +15,15 @@ const schema = {
 
 const text = (value, fallback = "") => typeof value === "string" ? value.trim().slice(0, 500) : fallback;
 const stringArray = (value) => Array.isArray(value) ? value.filter((item) => typeof item === "string").map((item) => item.trim().slice(0, 240)).slice(0, 4) : [];
+
+export function getAiConfig(env = process.env) {
+  const baseUrl = (env.AI_BASE_URL || env.BASE_URL || env.OPENAI_BASE_URL || DEFAULT_AI_BASE_URL).replace(/\/+$/, "");
+  return {
+    apiKey: env.AI_API_KEY || env.API_KEY || env.OPENAI_API_KEY || "",
+    baseUrl,
+    model: env.AI_MODEL || env.MODEL || env.OPENAI_MODEL || "moonshot-v1-8k",
+  };
+}
 
 export function buildRiskPrompt(body) {
   return JSON.stringify({
@@ -60,15 +69,14 @@ export default async function handler(request, response) {
   }
 
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const { apiKey, baseUrl, model } = getAiConfig();
     if (!apiKey) {
       response.statusCode = 503;
       response.end(JSON.stringify({ error: "AI explanation is not configured" }));
       return;
     }
     const body = await readBody(request);
-    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
-    const upstream = await fetch(OPENAI_URL, {
+    const upstream = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
