@@ -11,14 +11,12 @@ import {
   canonicalize,
   createDraft,
   createEvidence,
-  createLiveEvidencePlaceholder,
   createRiskCapsule,
   evaluateVerdict,
   runDeterministicChecks,
   shortAddress,
 } from "./core.js";
 import { FixtureAdapter, LiveFdcAdapter } from "./evidence.js";
-import "./styles.css";
 
 const app = document.querySelector("#app");
 const state = {
