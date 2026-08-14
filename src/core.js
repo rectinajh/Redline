@@ -122,6 +122,7 @@ export function shortAddress(address) {
 
 export function runDeterministicChecks(draft) {
   const minimumOutputBps = Math.floor(Number(draft.minOutput) * 10_000 / DEMO_QUOTED_OUTPUT);
+  const routerMatches = draft.router.toLowerCase() === DEMO_ROUTER.toLowerCase();
   const checks = [
     {
       id: "network",
@@ -132,8 +133,8 @@ export function runDeterministicChecks(draft) {
     {
       id: "router",
       label: "Router allowlist",
-      status: draft.router.toLowerCase() === DEMO_ROUTER ? CHECK_STATUS.OK : CHECK_STATUS.BLOCKED,
-      detail: draft.router.toLowerCase() === DEMO_ROUTER ? "Known demo route" : "Router is not allowlisted",
+      status: routerMatches ? CHECK_STATUS.OK : CHECK_STATUS.BLOCKED,
+      detail: routerMatches ? "Known demo route" : "Router is not allowlisted",
     },
     {
       id: "slippage",
@@ -222,7 +223,8 @@ export function createEvidence(draft, kind = "held") {
 }
 
 export function evaluateVerdict(draft, evidence) {
-  if (!evidence || evidence.verificationStatus !== "VERIFIED") return { status: STATUS.UNVERIFIED, reasons: ["Evidence is not verified."] };
+  const verified = evidence?.verificationStatus === "VERIFIED" || evidence?.verificationStatus === "ONCHAIN_LINE_HELD";
+  if (!evidence || !verified) return { status: STATUS.UNVERIFIED, reasons: ["Evidence is not verified."] };
   if (evidence.router.toLowerCase() !== draft.router.toLowerCase()) return { status: STATUS.MISMATCHED, reasons: ["Router does not match the Receipt."] };
   const crossed = BigInt(evidence.amountIn) > BigInt(draft.maxInput) || BigInt(evidence.amountOut) < BigInt(draft.minOutput);
   return crossed
