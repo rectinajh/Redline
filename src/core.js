@@ -1,5 +1,7 @@
 export const COSTON2_CHAIN_ID = 114;
+export const COSTON2_RPC_URL = "https://coston2-api.flare.network/ext/C/rpc";
 export const SEPOLIA_CHAIN_ID = 11155111;
+export const REDLINE_RECEIPT_CONTRACT = "0x01Dd46c45c7d5fC805B93CD331d6FaA60C735B74";
 // The controlled MVP route is a real Sepolia ETH -> USDC transaction shape.
 // Fixture replay remains explicitly labeled; these values also match Coston2 deploy defaults.
 export const DEMO_ROUTER = "0x7DfD4F31be6814D2906BDE155c3e1B146EAc1468";
@@ -16,6 +18,8 @@ export const LIVE_EXTERNAL_TX = "0xf85d179a409f364e3bfea157155484cec869f7b61df81
 
 export const STATUS = Object.freeze({
   DRAFT: "DRAFT",
+  PUBLISHING: "PUBLISHING",
+  ONCHAIN_PUBLISHED: "ONCHAIN_PUBLISHED",
   SIGNED: "SIGNED",
   TRADE_SUBMITTED: "TRADE_SUBMITTED",
   PROOF_REQUESTED: "PROOF_REQUESTED",
@@ -87,9 +91,9 @@ export function createDraft(preset = PRESETS[0]) {
     minOutput: String(Math.floor(DEMO_QUOTED_OUTPUT * preset.minOutputBps / 10_000)),
     maxPositionBps: preset.maxPositionBps,
     expiry,
-    simulationHash: randomHex(16),
-    riskAssessmentHash: randomHex(16),
-    threatIntelSnapshotHash: randomHex(16),
+    simulationHash: randomHex(32),
+    riskAssessmentHash: randomHex(32),
+    threatIntelSnapshotHash: randomHex(32),
     nonce: randomHex(16),
     reason: "I am testing whether this trade deserves my attention and capital.",
   };
@@ -169,6 +173,26 @@ export function createRiskCapsule(draft, checks, mode = "FIXTURE") {
   const cautionCount = checks.filter((check) => check.status === CHECK_STATUS.CAUTION).length;
   const score = Math.min(96, 42 + cautionCount * 10 + (blocked ? 35 : 0));
   const riskLevel = blocked ? "BLOCKED" : score >= 70 ? "ELEVATED" : "WATCH";
+  const ai = mode === "FIXTURE"
+    ? {
+      status: "FIXTURE",
+      modelVersion: "redline-explain-v1",
+      summary: blocked
+        ? "The transaction crosses a hard boundary before signing. Stop and inspect the route."
+        : "Your line is doing useful work: the size is contained, the path is known, and the remaining concern is execution quality.",
+      reasons: blocked
+        ? ["A deterministic check is blocked.", "AI cannot override the router or network boundary."]
+        : ["Position size is bounded by your preset.", "The final output and approval surface still deserve attention."],
+      confidence: 0.74,
+    }
+    : {
+      status: "AI_UNAVAILABLE",
+      modelVersion: "none",
+      summary: "No live model explanation has been requested yet.",
+      reasons: ["Deterministic checks are available now.", "Configure the server-side AI key to request a grounded explanation."],
+      action: "AI never changes the Coston2 verdict.",
+      confidence: null,
+    };
   return {
     schemaVersion: "risk_capsule.v1",
     generatedAt: nowIso(),
@@ -184,17 +208,7 @@ export function createRiskCapsule(draft, checks, mode = "FIXTURE") {
       confidence: 0.78,
       note: "Single auditable snapshot; absence of evidence is not SAFE.",
     },
-    ai: {
-      status: mode === "FIXTURE" ? "FIXTURE" : "AI_UNAVAILABLE",
-      modelVersion: "redline-explain-v1",
-      summary: blocked
-        ? "The transaction crosses a hard boundary before signing. Stop and inspect the route."
-        : "Your line is doing useful work: the size is contained, the path is known, and the remaining concern is execution quality.",
-      reasons: blocked
-        ? ["A deterministic check is blocked.", "AI cannot override the router or network boundary."]
-        : ["Position size is bounded by your preset.", "The final output and approval surface still deserve attention."],
-      confidence: 0.74,
-    },
+    ai,
     simulationHash: draft.simulationHash,
   };
 }
@@ -223,8 +237,12 @@ export function createEvidence(draft, kind = "held") {
 }
 
 export function evaluateVerdict(draft, evidence) {
-  const verified = evidence?.verificationStatus === "VERIFIED" || evidence?.verificationStatus === "ONCHAIN_LINE_HELD";
+  const verified = evidence?.verificationStatus === "VERIFIED"
+    || evidence?.verificationStatus === "ONCHAIN_LINE_HELD"
+    || evidence?.verificationStatus === "ONCHAIN_LINE_CROSSED";
   if (!evidence || !verified) return { status: STATUS.UNVERIFIED, reasons: ["Evidence is not verified."] };
+  if (evidence.onchainStatus === STATUS.LINE_HELD) return { status: STATUS.LINE_HELD, reasons: [evidence.resultReason] };
+  if (evidence.onchainStatus === STATUS.LINE_CROSSED) return { status: STATUS.LINE_CROSSED, reasons: [evidence.resultReason] };
   if (evidence.router.toLowerCase() !== draft.router.toLowerCase()) return { status: STATUS.MISMATCHED, reasons: ["Router does not match the Receipt."] };
   const crossed = BigInt(evidence.amountIn) > BigInt(draft.maxInput) || BigInt(evidence.amountOut) < BigInt(draft.minOutput);
   return crossed
@@ -232,24 +250,31 @@ export function evaluateVerdict(draft, evidence) {
     : { status: STATUS.LINE_HELD, reasons: [evidence.resultReason] };
 }
 
-export function createLiveEvidence() {
+export function createLiveEvidence({ receiptId = LIVE_RECEIPT_ID, onchain = { status: STATUS.LINE_HELD, statusCode: 3, receipt: null } } = {}) {
+  const onchainStatus = onchain.status;
+  const receipt = onchain.receipt || {};
+  const isKnownLive = receiptId.toLowerCase() === LIVE_RECEIPT_ID.toLowerCase();
+  const hasVerdict = onchainStatus === STATUS.LINE_HELD || onchainStatus === STATUS.LINE_CROSSED;
   return {
     schemaVersion: "evidence.v1",
-    provenance: "LIVE",
-    source: "Coston2 FDC verified Receipt",
-    verificationStatus: "ONCHAIN_LINE_HELD",
+    provenance: isKnownLive && hasVerdict ? "LIVE" : "ONCHAIN",
+    source: isKnownLive && hasVerdict ? "Coston2 FDC verified Receipt" : "Coston2 Receipt state",
+    verificationStatus: isKnownLive && hasVerdict ? `ONCHAIN_${onchainStatus}` : "UNVERIFIED",
     retrievedAt: nowIso(),
-    externalChainId: SEPOLIA_CHAIN_ID,
-    transactionHash: LIVE_EXTERNAL_TX,
-    router: DEMO_ROUTER,
-    tokenIn: DEMO_TOKEN_IN,
-    tokenOut: DEMO_TOKEN_OUT,
-    amountIn: "1000000000000000",
-    amountOut: "33320629",
-    receiptId: LIVE_RECEIPT_ID,
-    verdictUrl: `https://coston2-explorer.flare.network/tx/${LIVE_VERDICT_TX}`,
-    externalTxUrl: `https://sepolia.etherscan.io/tx/${LIVE_EXTERNAL_TX}`,
-    proofReference: "FDC round 1425147 · 3 Merkle proof nodes",
-    resultReason: "Coston2 consumed the FDC proof and emitted LINE HELD.",
+    externalChainId: Number(receipt.chainId || SEPOLIA_CHAIN_ID),
+    transactionHash: isKnownLive ? LIVE_EXTERNAL_TX : "",
+    router: receipt.router || DEMO_ROUTER,
+    tokenIn: receipt.tokenIn || DEMO_TOKEN_IN,
+    tokenOut: receipt.tokenOut || DEMO_TOKEN_OUT,
+    amountIn: isKnownLive ? "1000000000000000" : "0",
+    amountOut: isKnownLive ? "33320629" : "0",
+    receiptId,
+    verdictUrl: isKnownLive && hasVerdict ? `https://coston2-explorer.flare.network/tx/${LIVE_VERDICT_TX}` : "",
+    externalTxUrl: isKnownLive ? `https://sepolia.etherscan.io/tx/${LIVE_EXTERNAL_TX}` : "",
+    proofReference: "FDC round 1425147 · Coston2 receipt state",
+    onchainStatus,
+    resultReason: hasVerdict
+      ? `Coston2 consumed the FDC proof and emitted ${onchainStatus}.`
+      : "Receipt is published on Coston2 and is waiting for an FDC verdict.",
   };
 }

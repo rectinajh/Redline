@@ -7,7 +7,7 @@
 
 ## 1. Product definition
 
-Redline Receipt is a pre-trade decision guardrail. A trader writes their own limits before a high-risk swap, reviews a risk brief, and signs a Decision Receipt. The trader still executes the swap directly with their wallet. Afterward, Flare verifies external-chain facts with FDC and judges whether the user kept their own line.
+Redline Receipt is a pre-trade decision guardrail. A trader writes their own limits before a high-risk swap, reviews a risk brief, and publishes the Receipt to Coston2. The trader still executes the swap directly with their wallet. Afterward, Flare verifies external-chain facts with FDC and judges whether the user kept their own line.
 
 > Redline is not an AI trading bot that predicts price. It makes self-deception harder before signing and proves rule-following after the trade.
 
@@ -37,7 +37,7 @@ Existing warnings usually describe a contract risk but do not bind a trader's ow
 ## 4. Core mechanic
 
 ```text
-Draw the line → see the risk → sign the Receipt → make the trade → let Flare judge
+Draw the line → see the risk → publish it on Coston2 → make the trade → let Flare judge
 ```
 
 The minimum Receipt binds:
@@ -62,9 +62,9 @@ The fixed MVP presets are:
 - **No Unknown Router:** an allowlist boundary for the controlled router.
 - **Cooling-Off Trade:** a short expiry that forces a re-check before action.
 
-### Risk brief and signing boundary
+### Risk brief and publishing boundary
 
-The Risk Capsule shows route, network, expected asset delta, simulation state, allowance surface, source labels, and AI explanation. Its boundary is explicit: deterministic rules may block, AI can only explain, and the wallet is the only signer.
+The Risk Capsule shows route, network, expected asset delta, simulation state, allowance surface, source labels, and an optional live AI explanation. Its boundary is explicit: deterministic rules may block, AI can only explain, and the wallet is the only signer for the Coston2 Receipt transaction.
 
 ### After the trade
 
@@ -104,6 +104,8 @@ The controlled demonstration has completed one real path:
 
 - [x] Coston2 contracts and explorer links exist.
 - [x] An FDC request reaches a verified on-chain adapter.
+- [x] The browser can publish a Receipt directly to the deployed Coston2 contract.
+- [x] The browser reads the deployed Receipt state through the public Coston2 RPC.
 - [x] A Receipt has produced `LINE_HELD` from verified facts.
 - [x] Receipt limits, expiry, mismatch, and replay paths have contract tests.
 - [x] Fixture states are visibly distinguished from the live evidence card.
@@ -118,10 +120,11 @@ The controlled demonstration has completed one real path:
 
 1. Set a limit for the controlled ETH → USDC route.
 2. Show the risk brief and explicit wallet boundary.
-3. Show the signed Decision Receipt.
-4. Open LIVE FDC and the Sepolia transaction.
+3. Publish the Receipt on Coston2 and show the `ReceiptCreated` transaction.
+4. Open LIVE FDC and read the Receipt state from Coston2.
 5. Open the Coston2 `LINE_HELD` verdict.
-6. Replay an explicitly labeled crossed fixture.
+6. Request the optional live AI explanation, or show the explicit unavailable state.
+7. Replay an explicitly labeled crossed fixture.
 
 ## 10. Submission copy
 

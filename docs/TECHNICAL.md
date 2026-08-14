@@ -34,9 +34,10 @@ Out of scope: automated signing or execution, custody, upgradeable contracts, a 
 
 ```text
 Web UI
-  ├─ presets, deterministic checks, fixture Risk Capsule
-  ├─ Decision Receipt signing boundary
-  └─ live evidence card and fixture replay
+  ├─ presets, deterministic checks, local Risk Capsule
+  ├─ browser Coston2 Receipt publisher
+  ├─ optional server-side structured AI explainer
+  └─ on-chain evidence card and fixture replay
 
 FDC scripts
   ├─ prepare request through verifier API
@@ -49,7 +50,7 @@ Coston2 contracts
   └─ RedlineReceipt: limits + facts → immutable verdict
 ```
 
-The browser never holds a deployment private key. `.env` is local-only and ignored by Git. The static UI is deliberately separate from the deployment and proof scripts.
+The browser never holds a deployment private key. `.env` is local-only and ignored by Git. The browser uses the user's injected wallet only for the Coston2 `submitReceipt` transaction; deployment keys, FDC verifier keys, DA Layer keys, and the optional AI key remain server-side or local-only.
 
 ## 3. Data model
 
@@ -207,6 +208,7 @@ Environment keys are documented in `.env.example`. Real values belong only in `.
 
 - Validate EVM addresses, hashes, integer base units, expiry, and allowed routes before creating a Receipt.
 - Do not accept a frontend boolean, server database record, or fixture as FDC evidence.
+- The browser's `LIVE FDC` view reads the Receipt status and fields from the public Coston2 RPC; it does not treat a local fixture as chain state.
 - Fail closed if FDC proof verification or the controlled proof-shape checks fail.
 - Use a user nonce and a consumed flag to prevent a Receipt from being evaluated twice.
 - Never log, publish, or commit private keys, verifier keys, or DA Layer keys.

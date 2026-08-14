@@ -2,8 +2,9 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import riskBriefHandler from "../api/risk-brief.mjs";
 
-const root = fileURLToPath(new URL(".", import.meta.url));
+const root = fileURLToPath(new URL("..", import.meta.url));
 const port = Number(process.env.PORT || 4173);
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -14,6 +15,10 @@ const mime = {
 };
 
 const server = createServer(async (request, response) => {
+  if (request.url?.split("?")[0] === "/api/risk-brief") {
+    await riskBriefHandler(request, response);
+    return;
+  }
   const requested = request.url === "/" ? "/index.html" : request.url.split("?")[0];
   const safePath = normalize(join(root, requested));
   if (!safePath.startsWith(root)) {

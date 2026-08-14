@@ -6,3 +6,4 @@ dist/
 out/
 cache/
 .DS_Store
+.vercel

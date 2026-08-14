@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Redline Receipt — a Flare-powered pre-trade decision guardrail.",
   "scripts": {
-    "start": "node server.mjs",
+    "start": "node --env-file-if-exists=.env scripts/dev-server.mjs",
     "test": "node --test test/*.test.mjs",
     "fdc:prepare": "node --env-file=.env scripts/fdc/prepare-request.mjs",
     "fdc:submit": "node --env-file=.env scripts/fdc/submit-request.mjs",

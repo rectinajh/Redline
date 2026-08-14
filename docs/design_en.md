@@ -20,7 +20,7 @@ Redline is not a price-prediction bot, an autonomous trader, or a generic wallet
 The interaction is a small ritual with a visible consequence:
 
 1. The user draws a redline: pair, maximum position, maximum slippage, expiry.
-2. The user signs the Redline Receipt.
+2. The user publishes the Redline Receipt on Coston2.
 3. The user executes the trade.
 4. Flare acts as the external judge and says `LINE HELD` or `LINE CROSSED`.
 
@@ -35,7 +35,7 @@ The visual language is not a dashboard. It is a high-contrast trading checkpoint
 - One EVM test environment, one router, one token pair, and one demo transaction.
 - No multi-chain promise until the exact FDC EVM transaction source is confirmed.
 - No production financial advice, autonomous trading, custody, or guarantee of loss prevention.
-- The AI layer can translate natural language into candidate limits, but it cannot be the final judge.
+- The optional AI layer explains the supplied Receipt and verified facts, but it cannot be the final judge.
 - Moss can provide a deterministic simulation preview, but simulation output is not the trust root.
 
 ## Premises
@@ -44,7 +44,7 @@ The visual language is not a dashboard. It is a high-contrast trading checkpoint
 2. The unique mechanic is `Draw a redline → make the trade → Flare judges the receipt`.
 3. Flare must verify the external transaction or a cryptographically bound transaction fact. A front-end boolean or server database is not sufficient.
 4. FDC is the preferred Bounty 1 primitive because it can attest external transaction data and let a Flare contract verify a proof before producing the verdict.
-5. The first release is a proof of discipline, not a hard block. The user's wallet still signs the swap; Redline records whether the user kept the rules.
+5. The first release is a proof of discipline, not a hard block. The user's wallet still signs the swap; Redline first publishes the boundary on Coston2, then records whether the user kept the rules.
 6. A complete single-path demo scores better than a half-built multi-chain risk platform.
 
 ## Landscape Synthesis
@@ -62,7 +62,7 @@ Before the user signs, Redline presents a prioritized **Redline Brief** with fou
 1. **Risk priority**: `Oversized position`, `Slippage above your line`, or `Approval expands wallet exposure`.
 2. **Simulation**: expected token movement, estimated output, price impact, and approval delta from Moss or the deterministic simulator.
 3. **Data source**: label each fact as `FTSO reference`, `local simulation`, `wallet state`, or `FDC-verified transaction`.
-4. **Signing boundary**: `Redline cannot sign or execute this trade. Your wallet remains in control.`
+4. **Publishing boundary**: `Redline cannot sign or execute this trade. Your wallet publishes only the Receipt commitment.`
 
 This makes the product useful before the transaction, while the FDC-backed receipt remains the unique Flare mechanic after the transaction. The interface must never imply that an AI score is a guarantee or that Redline prevented a loss.
 
@@ -163,7 +163,7 @@ The contract should store a hash/commitment rather than unnecessary raw personal
 ### MVP UI states
 
 1. **Before**: `Draw your redline.` Show pair, max position, max slippage, expiry, and a single `DRAW MY REDLINE` button.
-2. **Brief**: Prioritize the biggest risk, show simulation and source labels, then state the signing boundary before the wallet prompt.
+2. **Brief**: Prioritize the biggest risk, show simulation and source labels, then state the publishing boundary before the wallet prompt.
 3. **During**: `Your line is set.` Show receipt hash, chain, router, and a link to execute the swap. Redline does not execute it.
 4. **After**: Show committed limits, actual transaction values, FDC proof status, and one large verdict: `LINE HELD` or `LINE CROSSED`.
 
@@ -185,7 +185,7 @@ The contract should store a hash/commitment rather than unnecessary raw personal
 
 1. A new viewer can explain the mechanic after watching the first 10 seconds.
 2. The demo shows a real pre-trade receipt, a real external transaction, an FDC proof state, and a Flare verdict.
-3. The pre-sign screen labels data sources, simulation output, and the exact signing boundary.
+3. The pre-publish screen labels data sources, simulation output, and the exact publishing boundary.
 4. Redline never requests a private key, never signs on behalf of the user, and never claims that a warning guarantees safety.
 5. The contract rejects an expired receipt, mismatched router or pair, over-limit amount/output, and replayed proof.
 6. The video shows both `LINE HELD` and `LINE CROSSED`.
@@ -212,7 +212,7 @@ For the hackathon, deployment is manual and documented. A post-hackathon GitHub 
 1. Confirm the exact FDC EVM transaction attestation path and target fixture. If this fails, stop expanding Redline and choose a supported transaction source immediately.
 2. Define the smallest receipt fields needed for the selected chain and write contract tests for held, crossed, expired, mismatched, and replayed cases.
 3. Deploy the receipt contract to Coston2 and create one known compliant fixture plus one known crossed fixture.
-4. Build the Redline Brief with prioritized risk, simulation, source labels, and explicit signing boundary. Keep it to one screen.
+4. Build the Redline Brief with prioritized risk, simulation, source labels, and explicit publishing boundary. Keep it to one screen.
 5. Build the verdict screen with the Redline language, not a dashboard.
 6. Publish the frontend, repository, addresses, and fixture links before recording.
 7. Record a 60–90 second video showing the redline, brief, transaction, proof, held result, crossed result, and explorer.

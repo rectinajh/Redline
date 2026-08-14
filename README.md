@@ -2,7 +2,7 @@
 
 > **Draw the line. Make the trade. Let Flare judge.**
 
-Redline Receipt is a pre-trade decision guardrail for high-risk swaps. Before a user signs, they set limits for input, output, and expiry. Redline explains the risk, but never signs or trades for them. After the trade, Flare Data Connector (FDC) verifies the external-chain facts and a Coston2 contract writes either `LINE_HELD` or `LINE_CROSSED`.
+Redline Receipt is a pre-trade decision guardrail for high-risk swaps. Before a user trades, they set limits for input, output, and expiry, then publish that boundary to Coston2. Redline explains the risk, but never executes the swap. After the trade, Flare Data Connector (FDC) verifies the external-chain facts and a Coston2 contract writes either `LINE_HELD` or `LINE_CROSSED`.
 
 Redline is not a price-prediction bot, a custodian, or an auto-executor. AI explains risk. Flare verifies facts. The user stays in control.
 
@@ -33,7 +33,7 @@ Sepolia ETH → USDC swap
 ## One clear mechanic
 
 ```text
-Set a redline → see the risk → sign a Receipt → make a trade → let Flare judge
+Set a redline → publish it on Coston2 → make a trade → let Flare judge
 ```
 
 The Receipt binds:
@@ -62,6 +62,10 @@ Prerequisites: Node.js, Foundry (`forge` and `cast`), and a Coston2-funded test 
 ```bash
 npm start
 # http://localhost:4173
+
+# Optional: enable the live AI evidence explainer locally.
+# Keep OPENAI_API_KEY server-side; the contract verdict never depends on it.
+OPENAI_API_KEY=... npm start
 
 npm test
 forge test
@@ -101,7 +105,10 @@ The deployment script deploys the FDC adapter first, then the immutable Receipt 
 ## What is implemented
 
 - Decision Receipt schema, canonicalization, expiry, nonce, and replay protection.
-- Deterministic risk checks plus an explicitly labeled fixture Risk Capsule.
+- Browser-side Coston2 `submitReceipt` publishing with transaction confirmation.
+- Coston2 RPC reads for the deployed Receipt status and fields.
+- Deterministic risk checks plus a local fallback Risk Capsule.
+- Optional server-side structured AI explanation grounded only in Receipt and FDC facts.
 - Presets for small probes, known routers, and cooling-off trades.
 - A fixture `LINE_HELD` and `LINE_CROSSED` replay for the UI.
 - A real `LIVE FDC` card for the deployed Coston2 `LINE_HELD` receipt.
@@ -110,12 +117,12 @@ The deployment script deploys the FDC adapter first, then the immutable Receipt 
 
 ## Demo script (60–90 seconds)
 
-1. Open Redline and choose **Probe Position**.
+1. Open Redline, connect a Coston2 wallet, and choose **Probe Position**.
 2. Show the user-authored `0.001 ETH` maximum and USDC minimum output.
-3. Show deterministic checks and explain that AI cannot override a blocked route.
-4. Sign the Decision Receipt. Clarify that the wallet still controls the trade.
-5. Open **LIVE FDC** and show the verified Sepolia transaction facts.
-6. Open the Coston2 verdict transaction and show `LINE_HELD`.
+3. Click **Publish Redline on Coston2** and show the real `ReceiptCreated` transaction.
+4. Open **LIVE FDC** and show the deployed Receipt state read from Coston2.
+5. Show the verified Sepolia transaction facts and the Coston2 `LINE_HELD` verdict.
+6. Click **Refresh risk brief** to request the optional live AI explanation; if no key is configured, show the explicit unavailable state.
 7. Run the fixture `LINE_CROSSED` replay to demonstrate the failure state without claiming it is live evidence.
 
 ## Documentation
@@ -138,7 +145,7 @@ The deployment script deploys the FDC adapter first, then the immutable Receipt 
 
 ## Roadmap
 
-1. Publish the static frontend and record the live proof walkthrough.
+1. Deploy the frontend and record the live Receipt publish/proof walkthrough.
 2. Add a second, real crossed transaction path.
 3. Support more FDC-verifiable EVM routes and non-smart-contract assets through FAssets.
 4. Keep private trade reasons and richer risk logic inside FCC only when it adds a real privacy benefit.

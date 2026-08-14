@@ -1,4 +1,5 @@
-import { createEvidence, createLiveEvidence } from "./core.js";
+import { LIVE_RECEIPT_ID, createEvidence, createLiveEvidence } from "./core.js";
+import { readReceipt } from "./chain.js";
 
 export class FixtureAdapter {
   constructor(kind = "held") {
@@ -16,7 +17,9 @@ export class LiveFdcAdapter {
   }
 
   async getEvidence() {
-    // This is one immutable, deployed Coston2 Receipt—not a generic live claim.
-    return createLiveEvidence();
+    const receiptId = this.config.receiptId || LIVE_RECEIPT_ID;
+    const onchain = await readReceipt(receiptId);
+    if (!onchain.receipt) throw new Error("Receipt is not published on Coston2");
+    return createLiveEvidence({ receiptId, onchain });
   }
 }
