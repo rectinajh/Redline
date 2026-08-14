@@ -5,6 +5,7 @@ import {
   INPUT_DECIMALS,
   INPUT_SYMBOL,
   LIVE_CROSSED_RECEIPT_ID,
+  LIVE_RECEIPT_ID,
   OUTPUT_DECIMALS,
   OUTPUT_SYMBOL,
   PRESETS,
@@ -170,7 +171,7 @@ function showLiveReceipt(kind = "held") {
   const isCrossed = kind === "crossed";
   state.activeTab = isCrossed ? "live-crossed" : "live";
   state.status = STATUS.PROOF_FINALIZED;
-  const receiptId = isCrossed ? LIVE_CROSSED_RECEIPT_ID : (state.receiptId || undefined);
+  const receiptId = isCrossed ? LIVE_CROSSED_RECEIPT_ID : LIVE_RECEIPT_ID;
   new LiveFdcAdapter({ receiptId }).getEvidence(state.draft).then((evidence) => {
     state.evidence = evidence;
     state.verdict = evaluateVerdict(state.draft, evidence);
