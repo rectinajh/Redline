@@ -12,3 +12,9 @@ test("the static page loads CSS through HTML instead of a browser JavaScript imp
   assert.doesNotMatch(main, /import\s+["']\.\/styles\.css["']/);
   assert.doesNotMatch(main, /createLiveEvidencePlaceholder/);
 });
+
+test("the shipped frontend copy is English-only", () => {
+  for (const file of ["src/core.js", "src/main.js", "src/evidence.js", "index.html"]) {
+    assert.doesNotMatch(read(file), /[\p{Script=Han}]/u, `${file} contains untranslated UI copy`);
+  }
+});
