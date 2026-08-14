@@ -1,261 +1,135 @@
-# Redline Receipt 产品需求文档
+# Redline Receipt — Product Requirements Document
 
-版本：PRD v1.0
-状态：Hackathon MVP
-目标 bounty：Bounty 1 — Interoperable Asset Products
-目标网络：Coston2，Chain ID 114
+**Version:** 1.0
+**Status:** Hackathon MVP
+**Bounty:** Bounty 1 — Interoperable Asset Products
+**Flare network:** Coston2, Chain ID `114`
 
-## 1. 产品定义
+## 1. Product definition
 
-Redline Receipt 是一个交易前决策护栏。用户准备进行一笔高风险 swap 时，先提交自己的最大仓位、最低输出和有效期；产品通过确定性检查和 AI Risk Brief 解释交易风险；用户仍由自己的钱包签名；交易完成后，Flare/FDC 验证外部链事实，并返回是否遵守了用户自己的红线。
+Redline Receipt is a pre-trade decision guardrail. A trader writes their own limits before a high-risk swap, reviews a risk brief, and signs a Decision Receipt. The trader still executes the swap directly with their wallet. Afterward, Flare verifies external-chain facts with FDC and judges whether the user kept their own line.
 
-核心句：
+> Redline is not an AI trading bot that predicts price. It makes self-deception harder before signing and proves rule-following after the trade.
 
-> Redline 不是预测涨跌的 AI 交易机器人，而是在签名前让风险变得难以自欺、在交易后证明用户是否遵守了自己的规则。
+## 2. Target users and problem
 
-## 2. 用户与问题
+**Target users** are DeFi traders who use volatile DEX routes, tend to chase trades or expand a position, and do not want to delegate signing authority to a bot or policy wallet.
 
-### 目标用户
+Existing warnings usually describe a contract risk but do not bind a trader's own limits to the final transaction. A handwritten plan is not verifiable. A transaction simulator predicts an outcome but does not prove whether the user followed their stated rule.
 
-- 使用 DEX 进行高波动资产 swap 的 DeFi 用户
-- 知道自己容易冲动追单、加仓或忽略滑点的交易者
-- 不希望把签名权交给自动交易 bot，但希望交易前有一层纪律护栏
-- 需要向自己或团队复盘“当时承诺了什么、实际做了什么”的用户
+## 3. Goals and non-goals
 
-### 用户问题
+### Goals
 
-现有钱包 warning 通常在签名前提醒风险，但无法表达用户自己的规则，也不会在交易后用外部链事实证明用户是否遵守了自己的承诺。普通模拟器能告诉用户交易可能发生什么，却不能把“我愿意承受的边界”绑定到后续真实交易。
+1. Explain the mechanic in ten seconds: “Draw a redline, make a trade, let Flare judge.”
+2. Give the user a useful pause before a risky signature.
+3. Demonstrate one complete FDC-backed, on-chain verdict path.
+4. Keep fixture replays clearly labeled and never present them as live FDC evidence.
+5. Deliver a public repository, deployed contracts, a public web app, and a 60–90 second video.
 
-### 现有替代方案的不足
+### Non-goals
 
-- 关闭页面或忽略钱包 warning
-- 手写交易计划，但计划不绑定真实交易
-- 普通 simulation dashboard，缺少用户承诺和事后证明
-- 自动 bot 或 policy wallet，把执行权交给系统
+- Price prediction, buy/sell advice, or profit guarantees.
+- Auto-signing, auto-execution, custody, or private-key storage.
+- Support for every chain, router, asset, or wallet.
+- A production threat-intelligence platform or FCC implementation in this MVP.
 
-## 3. 产品目标
-
-### 黑客松目标
-
-在一天级别的开发窗口中，完成一个可提交、可部署、可复核的 Flare mini app：
-
-1. 用户在 10 秒内理解“先画线，后交易，Flare 裁决”。
-2. 一条真实 Coston2/FDC 路径跑通。
-3. 两条 replay 路径稳定展示 `LINE HELD` 和 `LINE CROSSED`。
-4. Public Receipt 脱离钱包也可打开并复核证据。
-5. README、GitHub、技术材料、合约地址和演示视频可以组成完整提交包。
-
-### 非目标
-
-- 预测价格或给出买卖建议
-- 自动执行、托管资产、保存私钥
-- 把 AI 当作安全裁判
-- 支持所有链、所有 router 或所有钱包
-- 构建完整交易安全情报平台
-- 使用 FCC 完成本次 MVP
-
-## 4. 核心机制
+## 4. Core mechanic
 
 ```text
-Draw the line
-      ↓
-See the risk
-      ↓
-Sign the Receipt
-      ↓
-Make the trade
-      ↓
-Let Flare judge
-      ↓
-Keep the record
+Draw the line → see the risk → sign the Receipt → make the trade → let Flare judge
 ```
 
-### 用户承诺
-
-最小 Receipt 必须绑定：
+The minimum Receipt binds:
 
 ```text
-trader
-chainId
-router
-tokenIn
-tokenOut
-maxInput
-minOutput
-maxPositionBps
-expiry
-simulationHash
-riskAssessmentHash
-threatIntelSnapshotHash
-nonce
+trader, chainId, router, tokenIn, tokenOut,
+maxInput, minOutput, maxPositionBps, expiry,
+simulationHash, riskAssessmentHash, threatIntelSnapshotHash, nonce
 ```
 
-字段是否全部进入合约，以最终验证的 FDC proof 字段和 gas 预算为准；不能进入合约的长文本只保存 hash，Public Receipt 显示最小化摘要。
+Long private text is not stored on-chain. The MVP stores hashes and exposes only the minimum public evidence.
 
-## 5. 用户流程
+## 5. User experience
 
-### 5.1 选择红线
+### Before the trade
 
-用户选择一个 preset：
+The trader chooses a preset or writes limits. The screen displays the route, the maximum position, the minimum output, a deterministic safety checklist, and a clearly labeled Risk Capsule.
 
-- `Probe Position`：单笔最多使用钱包资产的 1%
-- `No Unknown Router`：未知 router 进入 `BLOCKED`
-- `Cooling-Off Trade`：高风险结果要求用户等待或重新确认
+The fixed MVP presets are:
 
-用户可以编辑金额、最低输出和 expiry。所有金额使用整数最小单位，不使用浮点。
+- **Probe Position:** a small position with a 1% maximum-position framing.
+- **No Unknown Router:** an allowlist boundary for the controlled router.
+- **Cooling-Off Trade:** a short expiry that forces a re-check before action.
 
-### 5.2 查看安全摘要
+### Risk brief and signing boundary
 
-页面展示：
+The Risk Capsule shows route, network, expected asset delta, simulation state, allowance surface, source labels, and AI explanation. Its boundary is explicit: deterministic rules may block, AI can only explain, and the wallet is the only signer.
 
-- 交易摘要：tokenIn、tokenOut、router、chainId
-- 仓位和最低输出
-- 确定性检查：路由、pair、授权、滑点、模拟、资产变化
-- Threat Intel：source、retrievedAt、expiresAt、confidence
-- AI Risk Brief：风险原因、风险等级、AI 状态
-- 数据真实性：`LIVE`、`FIXTURE`、`MOCK`、`UNVERIFIED`
+### After the trade
 
-AI Risk Brief 的固定文案边界：
+FDC verifies the chosen external transaction. The Receipt contract checks the proof, chain, router, assets, amounts, expiry, nonce, and replay state. It writes one final status:
 
-> AI 解释风险，但不决定交易是否安全。Redline 不会替你签名或执行交易。
+- `LINE_HELD`: verified facts meet the Receipt limits.
+- `LINE_CROSSED`: verified facts exceed a limit.
+- `MISMATCHED`, `EXPIRED`, or `REPLAYED`: the evidence cannot be accepted for that Receipt.
+- `UNVERIFIED`: the frontend must not claim a verdict when proof is absent or unsupported.
 
-### 5.3 签署 Receipt
+## 6. Trust and safety principles
 
-签名前展示完整 commitment 摘要和 signing boundary：
+1. The user never gives Redline a private key or execution authority.
+2. AI is an explanation layer, never a safety oracle.
+3. Deterministic checks may block a route; AI cannot override them.
+4. Only a Coston2 contract that consumed verified FDC evidence can create the final verdict.
+5. All live, fixture, mock, and unverified data must be visibly labeled.
+6. Receipts use an expiry, a trader nonce, and a consumed flag to prevent replay.
 
-> Redline cannot sign or execute this trade. Your wallet remains in control.
+## 7. Live MVP evidence
 
-确定性 `BLOCKED` 时，按钮不可继续；AI `HIGH` 不能独立产生链上 `BLOCKED`。
+The controlled demonstration has completed one real path:
 
-### 5.4 交易与 proof
-
-Receipt 和交易状态显式展示：
-
-```text
-DRAFT
-SIGNED
-TRADE_SUBMITTED
-PROOF_REQUESTED
-PROOF_FINALIZED
-VERIFIED
-```
-
-异常状态：
-
-```text
-PROOF_PENDING
-PROOF_TIMEOUT
-PROOF_INVALID
-EXPIRED
-MISMATCHED
-REPLAYED
-UNVERIFIED
-```
-
-### 5.5 Accountability Card
-
-交易后显示承诺与事实对照：
-
-| 承诺 | 真实事实 | 结果 |
-|---|---|---|
-| 最大输入 1% | 实际 0.8% | 通过 |
-| 最低输出 100 USDC | 实际输出 102 USDC | 通过 |
-| 允许 Router | Router 匹配 | 通过 |
-| 最终状态 | FDC verified | `LINE HELD` |
-
-越线时列出具体原因，例如实际金额超过 `maxInput`、实际输出低于 `minOutput`、router 不匹配或 Receipt 过期。
-
-### 5.6 Public Receipt
-
-`/receipt/:id` 是只读、可分享的复核页，默认最小化公开字段：
-
-- Receipt ID
-- 截断地址或地址 hash
-- chainId、交易哈希、合约地址
-- Receipt commitments 摘要
-- Risk Capsule hash、来源和 freshness
-- FDC 状态和最终 Verdict
-- live/fixture/mock/unverified 标签
-
-不公开完整私密理由、AI 原始 prompt、完整余额、历史交易和不必要的资产组合。
-
-## 6. 安全与信任原则
-
-1. 钱包始终由用户控制。
-2. AI 只能解释，不能生成交易事实、修改 Receipt 或决定最终 Verdict。
-3. 缺少 proof、AI 不可用、威胁情报过期都不能变成 `SAFE` 或 `LINE HELD`。
-4. 只有 Flare 合约写入的验证状态才是最终结果。
-5. live、fixture、mock 和 unverified 必须在每个证据卡片上显式标记。
-6. Receipt 使用不可枚举 ID、chainId、nonce、expiry 和 consumed 防重放。
-7. 合约 MVP 不可升级；配置变更通过新合约地址完成。
-
-## 7. 评审价值映射
-
-| 评审标准 | Redline 证据 |
+| Evidence | Value |
 |---|---|
-| 产品有用性 | 解决冲动交易和自我纪律问题，不要求用户交出执行权 |
-| Flare 集成质量 | FDC 验证外部交易事实，链上合约产生最终 held/crossed |
-| 技术执行 | Receipt commitment、proof 状态机、replay protection、schema 和错误处理 |
-| 新工作量 | Risk Capsule、Public Receipt、Redline Presets、Demo Replay、Accountability Card |
-| 清晰度 | 一个核心机制：用户先画线，Flare 判断是否守线 |
-| 未来潜力 | Evidence Adapter/Receipt v1 可扩展更多外部链和资产 |
+| External chain | Sepolia, `11155111` |
+| Attestation | `EVMTransaction` / `testETH` |
+| FDC round | `1425147` |
+| External swap | [0xf85d…dcb4](https://sepolia.etherscan.io/tx/0xf85d179a409f364e3bfea157155484cec869f7b61df81784b60cdab84eb1dcb4) |
+| Verified input | `0.001 ETH` |
+| Verified output | `33.320629 USDC` |
+| Receipt verdict | [`LINE_HELD`](https://coston2-explorer.flare.network/tx/0xdafac332ea09369949906ae4ae14227d46d9469460e43972f30c7b345f3641e2) |
 
-## 8. 验收标准
+## 8. Acceptance criteria
 
 ### P0
 
-- [x] Coston2 合约地址和 explorer 链接真实可打开
-- [x] 一条真实 FDC path 已从 request 跑至 on-chain verification
-- [x] `LINE HELD` 已由链上验证事实产生：[verdict tx](https://coston2-explorer.flare.network/tx/0xdafac332ea09369949906ae4ae14227d46d9469460e43972f30c7b345f3641e2)
-- [ ] `LINE CROSSED` 能指出具体越线原因
-- [ ] proof 无效时显示 `UNVERIFIED`
-- [ ] AI malformed/timeout 不影响确定性检查，不产生 `LINE HELD`
-- [ ] Demo Replay 清晰标记 `FIXTURE`
-- [ ] Public Receipt 不需要钱包即可读取
-- [ ] 最终提交没有 localhost 和未标注 mock fallback
+- [x] Coston2 contracts and explorer links exist.
+- [x] An FDC request reaches a verified on-chain adapter.
+- [x] A Receipt has produced `LINE_HELD` from verified facts.
+- [x] Receipt limits, expiry, mismatch, and replay paths have contract tests.
+- [x] Fixture states are visibly distinguished from the live evidence card.
 
 ### P1
 
-- [ ] 3 个 Redline Presets
-- [ ] Accountability Card
-- [ ] 390px 窄屏可读
-- [ ] retry、refresh、duplicate request 有幂等行为
-- [ ] 结构化日志可以用 receiptId 重建一次成功和一次失败流程
+- [ ] Publish a non-localhost app URL.
+- [ ] Record the 60–90 second demo video.
+- [ ] Add a second live transaction that produces `LINE_CROSSED`.
 
-## 9. Demo 脚本
+## 9. Demo outline
 
-开场：
+1. Set a limit for the controlled ETH → USDC route.
+2. Show the risk brief and explicit wallet boundary.
+3. Show the signed Decision Receipt.
+4. Open LIVE FDC and the Sepolia transaction.
+5. Open the Coston2 `LINE_HELD` verdict.
+6. Replay an explicitly labeled crossed fixture.
 
-> “Redline 不告诉你买不买。它先让你写下自己愿意承担什么，然后让 Flare 在交易后判断你有没有守住这条线。”
+## 10. Submission copy
 
-过程：
-
-1. 选择 `Probe Position`。
-2. 看到三条限制和 Risk Capsule。
-3. 强调 AI 只是解释层。
-4. 签署 Receipt，强调钱包仍由用户控制。
-5. 展示 FDC proof 状态。
-6. 展示 `LINE HELD`。
-7. 重放越线 fixture，展示 `LINE CROSSED`。
-8. 打开 Public Receipt，说明评审可以独立复核。
-
-收尾：
-
-> “AI 让风险变得可读，Flare 让承诺是否兑现变得可验证。”
-
-## 10. 提交信息模板
-
-```text
-项目名：Redline Receipt
-选择的 bounty：Bounty 1 — Interoperable Asset Products
-产品简介：交易前把用户自己的风险边界写成 Receipt，交易后通过 Flare/FDC 验证是否守线。
-目标用户：进行高风险 DeFi swap、希望控制冲动交易但不想交出钱包控制权的用户。
-Demo/App：TBD
-Video：TBD
-GitHub：https://github.com/rectinajh/Redline
-技术材料：README.md / docs/PRD.md / docs/TECHNICAL.md
-如何使用 Flare：FDC 验证外部 EVM 交易事实，Coston2 Receipt 合约写入最终 verdict。
-本次新做了什么：Receipt commitment、Risk Capsule、security summary、FDC adapter、held/crossed、replay protection、Public Receipt、Presets、Replay、Accountability Card。
-合约地址：FDC adapter [`0x0aeA880F18232fE82EdA800a874F5CbE99dd5693`](https://coston2-explorer.flare.network/address/0x0aeA880F18232fE82EdA800a874F5CbE99dd5693)；Redline Receipt [`0x01Dd46c45c7d5fC805B93CD331d6FaA60C735B74`](https://coston2-explorer.flare.network/address/0x01Dd46c45c7d5fC805B93CD331d6FaA60C735B74)
-短期 roadmap：更多 FDC 可验证事实来源和资产适配器；之后再评估 FCC 私密计算。
-```
+**Project:** Redline Receipt
+**Bounty:** Bounty 1 — Interoperable Asset Products
+**Summary:** A user-authored pre-trade Receipt becomes an on-chain accountability record. FDC verifies the external swap and Flare writes whether the user held or crossed their own line.
+**Target users:** DeFi traders seeking discipline without giving up wallet control.
+**How Flare is used:** FDC imports verifiable external EVM facts; Coston2 contracts compare them with the Receipt and write the verdict.
+**New work:** FDC proof adapter, immutable Receipt contract, proof-packing scripts, risk UX, live evidence card, fixture replays, and replay protection.
+**Contracts:** [adapter](https://coston2-explorer.flare.network/address/0x0aeA880F18232fE82EdA800a874F5CbE99dd5693), [Receipt](https://coston2-explorer.flare.network/address/0x01Dd46c45c7d5fC805B93CD331d6FaA60C735B74).
+**Short-term roadmap:** publish the app, add a real crossed path, then extend supported FDC routes and consider privacy-sensitive logic with FCC.

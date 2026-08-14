@@ -224,9 +224,9 @@ Before building any additional UI, prove the single risky assumption: one select
 
 ## What I noticed about how you think
 
-- You rejected names that sounded like compliance software and kept pushing for something “性感”, which exposed the real product energy: danger, temptation, and a visible line.
+- You rejected names that sounded like compliance software and kept pushing for something more compelling, which exposed the real product energy: danger, temptation, and a visible line.
 - You did not accept the first technically safe recommendation. You kept the core mechanic but demanded a product people would remember.
-- You described impulsive trading as a “刚的需求”, which is a stronger product framing than generic crypto safety or AI trading advice.
+- You described impulsive trading as a hard, immediate need, which is a stronger product framing than generic crypto safety or AI trading advice.
 - You chose the smallest complete route after comparing a higher-upside vault and a more dramatic FCC black box. That keeps the ambition in the story and the risk in the scope.
 
 ## Sources
